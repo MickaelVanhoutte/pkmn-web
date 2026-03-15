@@ -52,6 +52,7 @@ export interface FieldState {
   weatherTurnsRemaining: number;
   terrain: Terrain | null;
   terrainTurnsRemaining: number;
+  trickRoom: number; // turns remaining, 0 = inactive
   sides: [SideState, SideState];
 }
 
@@ -116,4 +117,5 @@ export interface ResolvedAction {
   speed: number;
   order: number;
   consumed?: boolean;
+  tiebreaker: number;
 }

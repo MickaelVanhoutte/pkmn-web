@@ -46,7 +46,8 @@ export type BattleEvent =
   | ForceSwitchEvent
   | PursuitHitEvent
   | TerrainSetEvent
-  | TerrainEndEvent;
+  | TerrainEndEvent
+  | ForceSwitchNeededEvent;
 
 interface BaseEvent {
   turn: number;
@@ -71,6 +72,7 @@ export interface MoveUseEvent extends BaseEvent {
   user: BattlePosition;
   moveName: string;
   moveId: MoveId;
+  moveType: TypeName;
   targets: BattlePosition[];
 }
 
@@ -81,6 +83,7 @@ export interface DamageEvent extends BaseEvent {
   currentHp: number;
   maxHp: number;
   source: 'move' | 'status' | 'weather' | 'hazard' | 'recoil' | 'item' | 'ability';
+  sourceDetail?: string; // e.g., move name, item name, ability name
 }
 
 export interface HealEvent extends BaseEvent {
@@ -90,6 +93,7 @@ export interface HealEvent extends BaseEvent {
   currentHp: number;
   maxHp: number;
   source: 'move' | 'status' | 'item' | 'ability' | 'drain' | 'terrain';
+  sourceDetail?: string; // e.g., item name, move name
 }
 
 export interface FaintEvent extends BaseEvent {
@@ -103,7 +107,10 @@ export interface SwitchInEvent extends BaseEvent {
   player: PlayerIndex;
   slot: SlotIndex;
   pokemonName: string;
+  speciesId: string;
   teamIndex: number;
+  currentHp: number;
+  maxHp: number;
 }
 
 export interface SwitchOutEvent extends BaseEvent {
@@ -254,14 +261,14 @@ export interface MessageEvent extends BaseEvent {
 export interface ScreenSetEvent extends BaseEvent {
   kind: 'screen-set';
   side: PlayerIndex;
-  screen: 'lightScreen' | 'reflect';
+  screen: 'lightScreen' | 'reflect' | 'tailwind';
   turns: number;
 }
 
 export interface ScreenEndEvent extends BaseEvent {
   kind: 'screen-end';
   side: PlayerIndex;
-  screen: 'lightScreen' | 'reflect';
+  screen: 'lightScreen' | 'reflect' | 'tailwind';
 }
 
 export interface SubstituteCreatedEvent extends BaseEvent {
@@ -334,4 +341,10 @@ export interface TerrainSetEvent extends BaseEvent {
 export interface TerrainEndEvent extends BaseEvent {
   kind: 'terrain-end';
   terrain: Terrain;
+}
+
+export interface ForceSwitchNeededEvent extends BaseEvent {
+  kind: 'force-switch-needed';
+  player: PlayerIndex;
+  slot: SlotIndex;
 }

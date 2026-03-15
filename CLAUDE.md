@@ -28,9 +28,9 @@ src/
     pokemon.ts           # PokemonSpecies, PokemonConfig, PokemonBattleState
     move.ts              # MoveData, MoveEffect, MoveTarget, MoveFlags
     ability.ts           # AbilityData, AbilityTrigger, AbilityHookContext/Result
-    item.ts              # ItemData (not yet fully implemented)
+    item.ts              # ItemData, ItemEffect, ItemCategory
     battle.ts            # BattleConfig, BattleState, TurnAction, BattlePhase, SideState
-    events.ts            # BattleEvent discriminated union (30 event kinds)
+    events.ts            # BattleEvent discriminated union (44 event kinds)
 
   data/                  # Data loading and lookup
     type-chart.ts        # getTypeEffectiveness(attackType, defenderTypes) -> 0/0.25/0.5/1/2/4
@@ -38,6 +38,7 @@ src/
     ability-registry.ts  # getAbility(id), registerAbilityHandler(), getAbilityHandler()
     pokemon-registry.ts  # getSpecies(id), getAllSpecies()
     ability-handlers.ts  # All ability handler implementations, registerAllAbilityHandlers()
+    item-registry.ts     # getItem(id), getAllItems()
 
   model/                 # Runtime state management
     pokemon.ts           # createPokemonBattleState(), applyDamage(), applyHeal(), setStatus(), cureStatus()
@@ -66,9 +67,24 @@ tests/
   data/type-chart.test.ts
   engine/damage-calc.test.ts
   engine/status-processor.test.ts
+  engine/screen.test.ts
+  engine/substitute.test.ts
+  engine/multi-hit.test.ts
+  engine/confusion.test.ts
+  engine/charge-moves.test.ts
+  engine/force-switch.test.ts
+  engine/pursuit.test.ts
+  engine/items.test.ts
+  engine/terrain.test.ts
+  engine/ability-handlers.test.ts
+  engine/dual-type-effectiveness.test.ts
+  engine/modifier-stacking.test.ts
   integration/singles-battle.test.ts
   integration/doubles-battle.test.ts
   integration/status-weather-interaction.test.ts
+  integration/new-features-interaction.test.ts
+  integration/weather-damage-calc.test.ts
+  integration/end-of-turn.test.ts
 ```
 
 ## Architecture
@@ -162,8 +178,9 @@ Add to `data/pokemon.json`. Required: id, name, types, baseStats, possibleAbilit
 ## Current Starter Content
 
 - **18 Pokemon**: Snorlax, Charizard, Blastoise, Jolteon, Venusaur, Lapras, Lucario, Gengar, Garchomp, Togekiss, Alakazam, Scizor, Tyranitar, Dragonite, Swampert, Ferrothorn, Azumarill, Metagross
-- **32 Moves**: 18 type-coverage attacks + Protect, Stealth Rock, Spikes, Rapid Spin, Quick Attack, Recover, Swords Dance, Will-O-Wisp, Thunder Wave, Rain Dance, Sunny Day, Sandstorm, Hail, Giga Drain, Double-Edge
+- **48 Moves**: 18 type-coverage attacks + Protect, Stealth Rock, Spikes, Rapid Spin, Quick Attack, Recover, Swords Dance, Will-O-Wisp, Thunder Wave, Rain Dance, Sunny Day, Sandstorm, Hail, Giga Drain, Double-Edge, Light Screen, Reflect, Substitute, Rock Blast, Bullet Seed, Icicle Spear, Dual Wingbeat, Confuse Ray, Solar Beam, Fly, Whirlwind, Roar, Pursuit, Electric/Grassy/Psychic/Misty Terrain
 - **20 Abilities**: Blaze, Torrent, Overgrow, Static, Intimidate, Levitate, Chlorophyll, Swift Swim, Clear Body, Huge Power, Water Absorb, Sand Stream, Natural Cure, Serene Grace, Technician, Iron Fist, Inner Focus, Sturdy, Pressure, Multiscale
+- **15 Items**: Potion, Super Potion, Full Restore, status cures (Antidote, Burn Heal, etc.), Leftovers, Life Orb, Choice Band/Specs/Scarf, Focus Sash
 
 ## Not Yet Implemented
 

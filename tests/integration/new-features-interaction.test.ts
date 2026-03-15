@@ -435,9 +435,9 @@ describe('Cross-feature interactions', () => {
     expect(snorlax.status).toBeNull();
   });
 
-  it('Life Orb + multi-hit: recoil per hit', () => {
+  it('Life Orb + multi-hit: recoil once per move use', () => {
     // Scizor with Life Orb uses Bullet Seed (multi-hit).
-    // Should see recoil damage events (one per hit that deals damage).
+    // Life Orb recoil applies once per move use, not per hit (matching Showdown behavior).
 
     const config: BattleConfig = {
       format: 'singles',
@@ -496,18 +496,11 @@ describe('Cross-feature interactions', () => {
     // Multi-hit should have landed at least 2 hits
     expect(hitDamageEvents.length).toBeGreaterThanOrEqual(2);
 
-    // There should be one recoil event per hit
-    expect(recoilEvents.length).toBe(hitDamageEvents.length);
+    // Life Orb recoil applies once per move use, not per hit (Showdown behavior)
+    expect(recoilEvents.length).toBe(1);
 
-    // Scizor should have lost HP from life orb recoil
-    const scizorAfter = engine.getActivePokemon(0 as PlayerIndex, 0)!;
-    const expectedRecoilPerHit = Math.max(1, Math.floor(scizorMaxHp / 10));
-    const totalExpectedRecoil = expectedRecoilPerHit * recoilEvents.length;
-
-    // Account for possible damage taken from Snorlax's Tackle as well
-    // Just verify that recoil events have the right amount each
-    for (const recoilEvent of recoilEvents) {
-      expect((recoilEvent as any).amount).toBe(expectedRecoilPerHit);
-    }
+    // Scizor should have lost HP from life orb recoil (10% of max HP, once)
+    const expectedRecoil = Math.max(1, Math.floor(scizorMaxHp / 10));
+    expect((recoilEvents[0] as any).amount).toBe(expectedRecoil);
   });
 });

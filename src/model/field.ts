@@ -8,6 +8,7 @@ export function createFieldState(): FieldState {
     weatherTurnsRemaining: 0,
     terrain: null,
     terrainTurnsRemaining: 0,
+    trickRoom: 0,
     sides: [defaultSideState(), defaultSideState()],
   };
 }

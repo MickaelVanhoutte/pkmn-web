@@ -54,13 +54,6 @@ export class WeatherProcessor {
       }
     }
 
-    // Tick weather countdown
-    const ended = tickWeather(field);
-    if (ended) {
-      // The weather that just ended - we need to get it before it was cleared
-      // tickWeather already cleared it, so emit with the last known weather
-      // Actually tickWeather clears it, so let's adjust
-    }
   }
 
   processWeatherTick(field: FieldState, turn: number): void {

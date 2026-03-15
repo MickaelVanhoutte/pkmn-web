@@ -46,14 +46,28 @@ export class TurnResolver {
       let speed = 0;
 
       switch (action.type) {
-        case 'switch':
+        case 'switch': {
           priority = 100; // Switches go first
-          speed = 0;
+          // Faster pokemon switch first
+          const player = state.players[action.player];
+          const activeIdx = player.activePokemon[action.slot];
+          const pokemon = player.team[activeIdx];
+          if (pokemon && !pokemon.isFainted) {
+            speed = this.getEffectiveSpeed(pokemon, state.field, action.player);
+          }
           break;
-        case 'item':
+        }
+        case 'item': {
           priority = 99; // Items go second
-          speed = 0;
+          // Faster player uses items first
+          const itemPlayer = state.players[action.player];
+          const itemActiveIdx = itemPlayer.activePokemon[0]; // Use first active slot's speed
+          const itemPokemon = itemPlayer.team[itemActiveIdx];
+          if (itemPokemon && !itemPokemon.isFainted) {
+            speed = this.getEffectiveSpeed(itemPokemon, state.field, action.player);
+          }
           break;
+        }
         case 'run':
           priority = 98; // Run goes third
           speed = 0;
@@ -68,26 +82,35 @@ export class TurnResolver {
               const moveData = getMove(moveState.moveId);
               priority = moveData.priority;
             }
-            speed = this.getEffectiveSpeed(pokemon, state.field);
+            speed = this.getEffectiveSpeed(pokemon, state.field, action.player);
           }
           break;
         }
       }
 
-      return { action, priority, speed, order: i };
+      // Assign stable random tiebreaker upfront
+      return { action, priority, speed, order: i, tiebreaker: this.rng.next() };
     });
 
-    // Sort: higher priority first, then higher speed, then random
+    // Sort: higher priority first, then speed (inverted under Trick Room for moves), then tiebreaker
+    const trickRoomActive = state.field.trickRoom > 0;
     resolved.sort((a, b) => {
       if (a.priority !== b.priority) return b.priority - a.priority;
-      if (a.speed !== b.speed) return b.speed - a.speed;
-      return this.rng.next() < 0.5 ? -1 : 1;
+      // Trick Room inverts speed ordering for moves only (not switches/items)
+      if (a.speed !== b.speed) {
+        const bothMoves = a.action.type === 'move' && b.action.type === 'move';
+        if (trickRoomActive && bothMoves) {
+          return a.speed - b.speed; // slower goes first
+        }
+        return b.speed - a.speed; // faster goes first
+      }
+      return a.tiebreaker - b.tiebreaker;
     });
 
     return resolved;
   }
 
-  private getEffectiveSpeed(pokemon: PokemonBattleState, field: FieldState): number {
+  private getEffectiveSpeed(pokemon: PokemonBattleState, field: FieldState, playerIndex: PlayerIndex): number {
     let speed = pokemon.calculatedStats.spe;
 
     // Stat stages
@@ -98,8 +121,10 @@ export class TurnResolver {
       speed = Math.floor(speed * 0.5);
     }
 
-    // Tailwind
-    // Would need player index to check side, simplified here
+    // Tailwind: 2x speed
+    if (field.sides[playerIndex].tailwind > 0) {
+      speed = Math.floor(speed * 2);
+    }
 
     // Choice Scarf: 1.5x speed
     if (pokemon.item === 'choice-scarf') {
@@ -155,11 +180,22 @@ export class TurnResolver {
         const oppPokemon = oppPlayer.team[oppActiveIdx];
         if (!oppPokemon || oppPokemon.isFainted) continue;
 
+        // Can't use Pursuit if asleep or flinching
+        if (oppPokemon.status === 'sleep') continue;
+        if (hasVolatileStatus(oppPokemon, 'flinch')) continue;
+
         const moveState = oppPokemon.moves[ra.action.moveIndex];
         if (!moveState) continue;
         const moveData = getMove(moveState.moveId);
         const hasPursuit = moveData.effects.some(e => e.type === 'pursuit');
         if (!hasPursuit) continue;
+
+        // In doubles, Pursuit only triggers if the user was targeting the switching slot
+        if (state.config.format === 'doubles' && ra.action.targetPosition) {
+          if (ra.action.targetPosition.player !== action.player || ra.action.targetPosition.slot !== action.slot) {
+            continue;
+          }
+        }
 
         // Execute Pursuit with 2x power before the switch
         ra.consumed = true;
@@ -182,7 +218,7 @@ export class TurnResolver {
           kind: 'move-use', turn: state.turn,
           user: pursuitUserPos,
           moveName: pursuitMove.name, moveId: pursuitMove.id,
-          targets: [switchingPos],
+          moveType: pursuitMove.type, targets: [switchingPos],
         });
 
         // Execute the move against the switching pokemon (simplified - direct damage calc)
@@ -233,7 +269,14 @@ export class TurnResolver {
       }
     }
 
-    // Check flinch
+    const userPos: BattlePosition = { player: action.player, slot: action.slot };
+
+    // Check if can act (sleep) — checked before flinch so waking up isn't blocked by flinch
+    if (!this.statusProcessor.canAct(pokemon, userPos, state.turn)) {
+      return;
+    }
+
+    // Check flinch (after sleep so a just-woken pokemon isn't blocked)
     if (hasVolatileStatus(pokemon, 'flinch')) {
       removeVolatileStatus(pokemon, 'flinch');
       this.eventBus.emit({
@@ -243,16 +286,18 @@ export class TurnResolver {
       return;
     }
 
-    // Check if can act (sleep)
-    const userPos: BattlePosition = { player: action.player, slot: action.slot };
-    if (!this.statusProcessor.canAct(pokemon, state.turn)) {
-      return;
+    // Deduct PP here before confusion check (confusion self-hit still costs PP)
+    const moveState = pokemon.moves[action.moveIndex];
+    if (moveState) {
+      // PP deduction happens in move-executor for normal execution,
+      // but if confusion self-hit prevents the move, we still need PP deducted.
+      // We'll track whether PP was already deducted to avoid double-deduction.
     }
 
     // Check confusion
     if (hasVolatileStatus(pokemon, 'confusion')) {
-      pokemon.confusionTurns--;
-      if (pokemon.confusionTurns <= 0) {
+      // Check if confusion wears off first
+      if (pokemon.confusionTurns <= 1) {
         removeVolatileStatus(pokemon, 'confusion');
         pokemon.confusionTurns = 0;
         this.eventBus.emit({
@@ -260,16 +305,22 @@ export class TurnResolver {
           pokemonName: getPokemonName(pokemon),
         });
       } else {
+        pokemon.confusionTurns--;
         this.eventBus.emit({
           kind: 'message', turn: state.turn,
           text: `${getPokemonName(pokemon)} is confused!`,
         });
         // 33% chance to hit self
         if (this.rng.chance(33)) {
-          // Confusion self-damage: 40BP physical untyped against own stats
+          // Deduct PP even on confusion self-hit (games deduct PP before confusion check)
+          if (moveState && moveState.currentPp > 0) {
+            moveState.currentPp--;
+          }
+
+          // Confusion self-damage: 40BP physical untyped against own stats (with stat stages)
           const level = pokemon.config.level;
-          const atk = pokemon.calculatedStats.atk;
-          const def = pokemon.calculatedStats.def;
+          const atk = Math.floor(pokemon.calculatedStats.atk * getStatStageMultiplier(pokemon.statStages.atk));
+          const def = Math.floor(pokemon.calculatedStats.def * getStatStageMultiplier(pokemon.statStages.def));
           const damage = Math.max(1, Math.floor(
             (Math.floor((2 * level / 5 + 2) * 40 * atk / def) / 50) + 2,
           ));

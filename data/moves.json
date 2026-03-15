@@ -4,7 +4,7 @@
     "name": "Tackle",
     "type": "normal",
     "category": "physical",
-    "power": 40,
+    "power": 50,
     "accuracy": 100,
     "pp": 35,
     "priority": 0,
@@ -150,7 +150,7 @@
     "sound": false,
     "target": "adjacent-foe",
     "effects": [{ "type": "flinch", "chance": 30, "target": "target" }],
-    "flags": { "isProtectable": true, "isReflectable": false, "isMirrorMoveable": true, "isSnatchable": false, "isPunch": false, "isBite": false, "isBullet": false, "isSlicing": true }
+    "flags": { "isProtectable": true, "isReflectable": false, "isMirrorMoveable": true, "isSnatchable": false, "isPunch": false, "isBite": false, "isBullet": false, "isSlicing": false }
   },
   {
     "id": "psychic",
@@ -225,7 +225,7 @@
     "sound": false,
     "target": "adjacent-foe",
     "effects": [],
-    "flags": { "isProtectable": true, "isReflectable": false, "isMirrorMoveable": true, "isSnatchable": false, "isPunch": false, "isBite": false, "isBullet": false, "isSlicing": false }
+    "flags": { "isProtectable": true, "isReflectable": false, "isMirrorMoveable": true, "isSnatchable": false, "isPunch": false, "isBite": false, "isBullet": true, "isSlicing": false }
   },
   {
     "id": "dark-pulse",
@@ -354,7 +354,7 @@
     "category": "status",
     "power": null,
     "accuracy": null,
-    "pp": 5,
+    "pp": 10,
     "priority": 0,
     "contact": false,
     "sound": false,

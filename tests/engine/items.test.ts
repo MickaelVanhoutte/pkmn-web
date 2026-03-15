@@ -201,6 +201,129 @@ describe('Item Effects', () => {
     });
   });
 
+  describe('Focus Sash', () => {
+    it('should survive a lethal hit at full HP and be consumed', () => {
+      const engine = new BattleEngine(createItemTestConfig({
+        players: [
+          {
+            name: 'Player 1',
+            team: [
+              {
+                speciesId: 'snorlax',
+                level: 100,
+                abilityId: 'sturdy',
+                moveIds: ['earthquake', 'tackle', 'double-edge', 'recover'],
+              },
+            ],
+          },
+          {
+            name: 'Player 2',
+            team: [
+              {
+                speciesId: 'jolteon',
+                level: 1,
+                abilityId: 'static',
+                moveIds: ['thunderbolt', 'protect', 'tackle', 'thunder-wave'],
+                itemId: 'focus-sash',
+              },
+              {
+                speciesId: 'charizard',
+                level: 50,
+                abilityId: 'blaze',
+                moveIds: ['flamethrower', 'air-slash', 'dragon-pulse', 'sunny-day'],
+              },
+            ],
+          },
+        ],
+      }));
+      engine.startBattle();
+
+      const jolteon = engine.getActivePokemon(1 as PlayerIndex, 0)!;
+      expect(jolteon.item).toBe('focus-sash');
+      expect(jolteon.currentHp).toBe(jolteon.maxHp);
+
+      // Snorlax lv100 Earthquake vs Jolteon lv1 - would normally KO
+      engine.submitAction(0 as PlayerIndex, [
+        { type: 'move', player: 0 as PlayerIndex, slot: 0, moveIndex: 0 }, // Earthquake
+      ]);
+      engine.submitAction(1 as PlayerIndex, [
+        { type: 'move', player: 1 as PlayerIndex, slot: 0, moveIndex: 2 }, // Tackle (non-blocking)
+      ]);
+      const events = engine.resolveTurn();
+
+      // Focus Sash should have activated
+      const itemUsed = events.find(
+        e => e.kind === 'item-used' && (e as any).itemId === 'focus-sash'
+      );
+      expect(itemUsed).toBeDefined();
+
+      // Jolteon should survive with 1 HP
+      const jolteonAfter = engine.getActivePokemon(1 as PlayerIndex, 0)!;
+      expect(jolteonAfter.currentHp).toBe(1);
+
+      // Focus Sash should be consumed
+      expect(jolteonAfter.item).toBeNull();
+    });
+
+    it('should not activate if not at full HP', () => {
+      const engine = new BattleEngine(createItemTestConfig({
+        players: [
+          {
+            name: 'Player 1',
+            team: [
+              {
+                speciesId: 'snorlax',
+                level: 100,
+                abilityId: 'sturdy',
+                moveIds: ['earthquake', 'tackle', 'double-edge', 'recover'],
+              },
+            ],
+          },
+          {
+            name: 'Player 2',
+            team: [
+              {
+                speciesId: 'jolteon',
+                level: 1,
+                abilityId: 'static',
+                moveIds: ['thunderbolt', 'protect', 'tackle', 'thunder-wave'],
+                itemId: 'focus-sash',
+              },
+              {
+                speciesId: 'charizard',
+                level: 50,
+                abilityId: 'blaze',
+                moveIds: ['flamethrower', 'air-slash', 'dragon-pulse', 'sunny-day'],
+              },
+            ],
+          },
+        ],
+      }));
+      engine.startBattle();
+
+      const jolteon = engine.getActivePokemon(1 as PlayerIndex, 0)!;
+      // Reduce HP below max so Focus Sash won't trigger
+      jolteon.currentHp = jolteon.maxHp - 1;
+
+      engine.submitAction(0 as PlayerIndex, [
+        { type: 'move', player: 0 as PlayerIndex, slot: 0, moveIndex: 0 }, // Earthquake
+      ]);
+      engine.submitAction(1 as PlayerIndex, [
+        { type: 'move', player: 1 as PlayerIndex, slot: 0, moveIndex: 2 }, // Tackle (non-blocking)
+      ]);
+      const events = engine.resolveTurn();
+
+      // Focus Sash should NOT have activated
+      const itemUsed = events.find(
+        e => e.kind === 'item-used' && (e as any).itemId === 'focus-sash'
+      );
+      expect(itemUsed).toBeUndefined();
+
+      // Item should still be present
+      expect(jolteon.item).toBe('focus-sash');
+    });
+  });
+
   describe('Choice Band', () => {
     it('should lock the user into the first move used', () => {
       const engine = new BattleEngine(createItemTestConfig({

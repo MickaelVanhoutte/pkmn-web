@@ -47,17 +47,19 @@ export function createPokemonBattleState(
     ability: config.abilityId,
     lastMoveUsed: null,
     turnsSinceSwitch: 0,
-    slotIndex: 0,
+    slotIndex: -1,
     teamIndex,
     substituteHp: 0,
     confusionTurns: 0,
     chargeMoveId: null,
     chargeMoveTargetPos: null,
     choiceLocked: null,
+    consecutiveProtectUse: 0,
   };
 }
 
 export function applyDamage(pokemon: PokemonBattleState, amount: number): number {
+  if (amount <= 0) return 0;
   const actual = Math.min(amount, pokemon.currentHp);
   pokemon.currentHp -= actual;
   if (pokemon.currentHp <= 0) {
@@ -68,6 +70,7 @@ export function applyDamage(pokemon: PokemonBattleState, amount: number): number
 }
 
 export function applyHeal(pokemon: PokemonBattleState, amount: number): number {
+  if (amount <= 0) return 0;
   const actual = Math.min(amount, pokemon.maxHp - pokemon.currentHp);
   pokemon.currentHp += actual;
   return actual;

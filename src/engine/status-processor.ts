@@ -21,11 +21,28 @@ export class StatusProcessor {
   ): void {
     if (!pokemon.status || pokemon.isFainted) return;
 
-    pokemon.statusTurns++;
-
     if (pokemon.status === 'sleep') {
       this.processSleep(pokemon, position, turn);
       return;
+    }
+
+    pokemon.statusTurns++;
+
+    // Check weather-based curing BEFORE applying damage
+    // This prevents a pokemon from dying to status damage on the turn it would be cured
+    if (weather && this.shouldWeatherCure(pokemon.status, weather)) {
+      const cured = cureStatus(pokemon);
+      if (cured) {
+        this.eventBus.emit({
+          kind: 'status-cured',
+          turn,
+          target: position,
+          status: cured,
+          pokemonName: getPokemonName(pokemon),
+          source: 'weather',
+        });
+      }
+      return; // Cured — no damage this turn
     }
 
     // Apply typed status damage
@@ -52,22 +69,6 @@ export class StatusProcessor {
         target: position,
         pokemonName: getPokemonName(pokemon),
       });
-      return;
-    }
-
-    // Check weather-based curing
-    if (weather && this.shouldWeatherCure(pokemon.status, weather)) {
-      const cured = cureStatus(pokemon);
-      if (cured) {
-        this.eventBus.emit({
-          kind: 'status-cured',
-          turn,
-          target: position,
-          status: cured,
-          pokemonName: getPokemonName(pokemon),
-          source: 'weather',
-        });
-      }
     }
   }
 
@@ -92,7 +93,7 @@ export class StatusProcessor {
     }
   }
 
-  canAct(pokemon: PokemonBattleState, turn: number): boolean {
+  canAct(pokemon: PokemonBattleState, position: BattlePosition, turn: number): boolean {
     if (!pokemon.status) return true;
 
     if (pokemon.status === 'sleep') {
@@ -108,7 +109,7 @@ export class StatusProcessor {
         this.eventBus.emit({
           kind: 'status-cured',
           turn,
-          target: { player: 0, slot: 0 }, // caller should set correctly
+          target: position,
           status: 'sleep',
           pokemonName: getPokemonName(pokemon),
           source: 'natural',

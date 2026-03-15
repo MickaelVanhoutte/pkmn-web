@@ -57,40 +57,56 @@ export class MoveExecutor {
     // Charge move: check if this is the charge turn or execution turn
     const hasChargeEffect = moveData.effects.some(e => e.type === 'charge-turn');
     if (hasChargeEffect && !hasVolatileStatus(user, 'chargeMove')) {
-      // Charge turn: deduct PP, set charge state, return
-      moveState.currentPp--;
-      addVolatileStatus(user, 'chargeMove');
-      user.chargeMoveId = moveData.id;
-      user.chargeMoveTargetPos = targets.length > 0 ? targets[0].position : null;
-      this.eventBus.emit({
-        kind: 'move-use', turn, user: userPosition,
-        moveName: moveData.name, moveId: moveData.id,
-        targets: targets.map(t => t.position),
-      });
-      this.eventBus.emit({
-        kind: 'charging', turn, user: userPosition,
-        moveName: moveData.name, moveId: moveData.id,
-      });
-      user.lastMoveUsed = moveData.id;
-      return;
+      // Solar Beam skips charge in Sun
+      const skipCharge = moveData.id === 'solar-beam' && field.weather === 'sun';
+
+      if (!skipCharge) {
+        // Charge turn: deduct PP, set charge state, return
+        moveState.currentPp--;
+        addVolatileStatus(user, 'chargeMove');
+        user.chargeMoveId = moveData.id;
+        user.chargeMoveTargetPos = targets.length > 0 ? targets[0].position : null;
+
+        // Fly: set semi-invulnerable during charge
+        if (moveData.id === 'fly') {
+          addVolatileStatus(user, 'semiInvulnerable');
+        }
+
+        this.eventBus.emit({
+          kind: 'move-use', turn, user: userPosition,
+          moveName: moveData.name, moveId: moveData.id,
+          moveType: moveData.type, targets: targets.map(t => t.position),
+        });
+        this.eventBus.emit({
+          kind: 'charging', turn, user: userPosition,
+          moveName: moveData.name, moveId: moveData.id,
+        });
+        user.lastMoveUsed = moveData.id;
+        return;
+      }
+      // skipCharge: fall through to execute immediately (still deduct PP below)
     }
     // Execution turn: clear charge state, proceed normally
-    if (hasVolatileStatus(user, 'chargeMove')) {
+    const isChargeExecutionTurn = hasVolatileStatus(user, 'chargeMove');
+    if (isChargeExecutionTurn) {
       removeVolatileStatus(user, 'chargeMove');
+      removeVolatileStatus(user, 'semiInvulnerable');
       user.chargeMoveId = null;
       user.chargeMoveTargetPos = null;
     }
 
-    // Deduct PP (not for charge execution turn - already deducted on charge turn)
-    if (!hasChargeEffect) {
+    // Deduct PP:
+    // - Normal moves: always deduct
+    // - Charge moves on execution turn: already deducted during charge turn, skip
+    // - Charge moves that skip charge (e.g. Solar Beam in Sun): deduct here since charge turn was skipped
+    if (!isChargeExecutionTurn) {
       moveState.currentPp--;
     }
 
-    // Pressure: extra PP deduction
-    for (const t of targets) {
-      if (t.pokemon.ability === 'pressure' && !t.pokemon.isFainted) {
-        moveState.currentPp = Math.max(0, moveState.currentPp - 1);
-      }
+    // Pressure: extra PP deduction (max 1 extra regardless of number of Pressure targets)
+    const hasPressureTarget = targets.some(t => t.pokemon.ability === 'pressure' && !t.pokemon.isFainted);
+    if (hasPressureTarget) {
+      moveState.currentPp = Math.max(0, moveState.currentPp - 1);
     }
 
     // Emit move use
@@ -100,6 +116,7 @@ export class MoveExecutor {
       user: userPosition,
       moveName: moveData.name,
       moveId: moveData.id,
+      moveType: moveData.type,
       targets: targets.map(t => t.position),
     });
 
@@ -135,6 +152,7 @@ export class MoveExecutor {
     const hitCount = this.getHitCount(moveData);
 
     // Execute against each target (multi-hit wraps around)
+    let actualHits = 0;
     for (let hit = 0; hit < hitCount; hit++) {
       let anyHit = false;
       for (const target of targets) {
@@ -148,11 +166,28 @@ export class MoveExecutor {
         anyHit = true;
       }
       if (!anyHit) break; // All targets fainted
+      actualHits++;
     }
 
     if (hitCount > 1) {
       for (const target of targets) {
-        this.eventBus.emit({ kind: 'multi-hit-complete', turn, target: target.position, hitCount });
+        this.eventBus.emit({ kind: 'multi-hit-complete', turn, target: target.position, hitCount: actualHits });
+      }
+    }
+
+    // Life Orb recoil: once per move use, only if the move dealt damage
+    if (user.item === 'life-orb' && actualHits > 0 && !user.isFainted) {
+      const recoil = Math.max(1, Math.floor(user.maxHp / 10));
+      const recoilActual = applyDamage(user, recoil);
+      if (recoilActual > 0) {
+        this.eventBus.emit({
+          kind: 'damage', turn, target: userPosition,
+          amount: recoilActual, currentHp: user.currentHp, maxHp: user.maxHp,
+          source: 'recoil',
+        });
+        if (user.isFainted) {
+          this.eventBus.emit({ kind: 'faint', turn, target: userPosition, pokemonName: getPokemonName(user) });
+        }
       }
     }
 
@@ -177,6 +212,12 @@ export class MoveExecutor {
     turn: number,
     skipAccuracyCheck: boolean = false,
   ): void {
+    // Semi-invulnerable check (Fly charge turn)
+    if (hasVolatileStatus(target, 'semiInvulnerable')) {
+      this.eventBus.emit({ kind: 'miss', turn, user: userPos, target: targetPos, moveId: move.id });
+      return;
+    }
+
     // Check protect
     if (hasVolatileStatus(target, 'protect') && move.flags.isProtectable) {
       this.eventBus.emit({ kind: 'fail', turn, user: userPos, reason: `${getPokemonName(target)} protected itself!` });
@@ -184,17 +225,14 @@ export class MoveExecutor {
     }
 
     // Ability: onTryHit (e.g., Levitate, Water Absorb)
-    if (this.abilityDispatcher.shouldPrevent('onTryHit', target, {
+    const tryHitResults = this.abilityDispatcher.dispatch('onTryHit', target, targetPos, {
       source: target,
       move,
       target: user,
-    })) {
-      // Check for healing abilities like Water Absorb
-      const results = this.abilityDispatcher.dispatch('onTryHit', target, targetPos, {
-        source: target,
-        move,
-      }, turn);
-      for (const r of results) {
+    }, turn);
+    const shouldBlock = tryHitResults.some(r => r.action === 'prevent' || r.action === 'heal');
+    if (shouldBlock) {
+      for (const r of tryHitResults) {
         if (r.action === 'heal') {
           const healed = applyHeal(target, r.amount);
           if (healed > 0) {
@@ -212,11 +250,22 @@ export class MoveExecutor {
 
     // Accuracy check (for moves with accuracy, skip for subsequent multi-hit)
     if (move.accuracy !== null && !skipAccuracyCheck) {
+      // Weather-accuracy overrides
+      let weatherAccOverride: number | null = null;
+      if (field.weather === 'rain' && (move.id === 'thunder' || move.id === 'hurricane')) {
+        weatherAccOverride = 100; // Never miss in rain
+      } else if (field.weather === 'sun' && (move.id === 'thunder' || move.id === 'hurricane')) {
+        weatherAccOverride = 50; // 50% accuracy in sun
+      } else if (field.weather === 'hail' && move.id === 'blizzard') {
+        weatherAccOverride = 100; // Never miss in hail
+      }
+
+      const baseAcc = weatherAccOverride ?? move.accuracy;
       const accStage = user.statStages.accuracy;
       const evaStage = target.statStages.evasion;
       const accMult = getAccuracyEvasionMultiplier(accStage);
       const evaMult = getAccuracyEvasionMultiplier(-evaStage);
-      const finalAcc = move.accuracy * accMult * evaMult;
+      const finalAcc = baseAcc * accMult * evaMult;
 
       if (!this.rng.chance(finalAcc)) {
         this.eventBus.emit({ kind: 'miss', turn, user: userPos, target: targetPos, moveId: move.id });
@@ -249,6 +298,21 @@ export class MoveExecutor {
     // Sturdy check
     if (target.ability === 'sturdy' && target.currentHp === target.maxHp && damageResult.damage >= target.currentHp) {
       damageResult.damage = target.currentHp - 1;
+      this.eventBus.emit({
+        kind: 'ability-activate', turn, pokemon: targetPos,
+        abilityId: target.ability, abilityName: 'Sturdy',
+        message: `${getPokemonName(target)} hung on using Sturdy!`,
+      });
+    }
+
+    // Focus Sash check (same as Sturdy but consumes the item)
+    if (target.item === 'focus-sash' && target.currentHp === target.maxHp && damageResult.damage >= target.currentHp) {
+      damageResult.damage = target.currentHp - 1;
+      target.item = null;
+      this.eventBus.emit({
+        kind: 'item-used', turn, player: targetPos.player,
+        itemId: 'focus-sash', itemName: 'Focus Sash', target: targetPos,
+      });
     }
 
     // Multiscale
@@ -342,19 +406,7 @@ export class MoveExecutor {
       });
     }
 
-    // Life Orb recoil (10% max HP)
-    if (user.item === 'life-orb' && actual > 0 && !user.isFainted) {
-      const recoil = Math.max(1, Math.floor(user.maxHp / 10));
-      const recoilActual = applyDamage(user, recoil);
-      this.eventBus.emit({
-        kind: 'damage', turn, target: userPos,
-        amount: recoilActual, currentHp: user.currentHp, maxHp: user.maxHp,
-        source: 'recoil',
-      });
-      if (user.isFainted) {
-        this.eventBus.emit({ kind: 'faint', turn, target: userPos, pokemonName: getPokemonName(user) });
-      }
-    }
+    // Life Orb recoil is handled in executeMove after all hits/targets
   }
 
   private calculateMoveDamage(
@@ -455,9 +507,6 @@ export class MoveExecutor {
     const userTypes = user.species.types as TypeName[];
     const stab = userTypes.includes(move.type);
 
-    // Burn modifier (physical moves while burned)
-    const burnMod = (user.status === 'burn' && isPhysical) ? 0.5 : 1.0;
-
     // Choice Band/Specs stat boost
     if (user.item === 'choice-band' && isPhysical) {
       attack = Math.floor(attack * 1.5);
@@ -476,9 +525,24 @@ export class MoveExecutor {
     // Life Orb damage boost
     const lifeOrbMod = user.item === 'life-orb' ? 1.3 : 1.0;
 
+    // Effective power adjustments
+    let effectivePower = move.power ?? 0;
+
+    // Solar Beam halved power in Rain, Sandstorm, Hail
+    if (move.id === 'solar-beam' && field.weather && ['rain', 'sandstorm', 'hail'].includes(field.weather)) {
+      effectivePower = Math.floor(effectivePower / 2);
+    }
+
+    // Grassy Terrain halves Earthquake/Bulldoze power against grounded targets
+    if (field.terrain === 'grassy' && move.type === 'ground' && move.category !== 'status') {
+      if (this.isGrounded(target)) {
+        effectivePower = Math.floor(effectivePower / 2);
+      }
+    }
+
     return calculateDamage({
       level: user.config.level,
-      power: move.power ?? 0,
+      power: effectivePower,
       attack: Math.max(1, attack),
       defense: Math.max(1, defense),
       stab,
@@ -490,7 +554,6 @@ export class MoveExecutor {
       isSpread,
       randomFactor: this.rng.damageRoll(),
       otherModifiers: abilityDamageMod * screenMod * terrainMod * lifeOrbMod,
-      burnModifier: burnMod,
     });
   }
 
@@ -507,10 +570,19 @@ export class MoveExecutor {
       if (!this.rng.chance(effect.chance)) continue;
 
       switch (effect.type) {
-        case 'protect':
+        case 'protect': {
+          // Consecutive-use failure: 1/(3^n) chance of success on nth consecutive use
+          const protectChance = Math.pow(3, -user.consecutiveProtectUse) * 100;
+          if (!this.rng.chance(protectChance)) {
+            user.consecutiveProtectUse++;
+            this.eventBus.emit({ kind: 'fail', turn, user: userPos, reason: 'But it failed!' });
+            break;
+          }
+          user.consecutiveProtectUse++;
           addVolatileStatus(user, 'protect');
           this.eventBus.emit({ kind: 'message', turn, text: `${getPokemonName(user)} protected itself!` });
           break;
+        }
 
         case 'heal': {
           const amount = Math.floor(user.maxHp * (effect.value ?? 50) / 100);
@@ -643,6 +715,18 @@ export class MoveExecutor {
               this.eventBus.emit({ kind: 'fail', turn, user: userPos, reason: `The Misty Terrain prevents status conditions!` });
               break;
             }
+            // Electric Terrain prevents sleep on grounded pokemon
+            if (field.terrain === 'electric' && effect.status === 'sleep' && this.isGrounded(effectTarget)) {
+              this.eventBus.emit({ kind: 'fail', turn, user: userPos, reason: `The Electric Terrain prevents sleep!` });
+              break;
+            }
+            // Type immunities for status
+            const targetTypes = effectTarget.species.types as TypeName[];
+            if (effect.status === 'burn' && targetTypes.includes('fire')) break;
+            if (effect.status === 'paralysis' && targetTypes.includes('electric')) break;
+            if (effect.status === 'poison' && (targetTypes.includes('poison') || targetTypes.includes('steel'))) break;
+            if (effect.status === 'freeze' && targetTypes.includes('ice')) break;
+
             const didApply = setStatus(effectTarget, effect.status);
             if (didApply) {
               this.eventBus.emit({
@@ -766,6 +850,11 @@ export class MoveExecutor {
           if (!effectTarget.isFainted && !hasVolatileStatus(effectTarget, 'confusion')) {
             if (hasVolatileStatus(effectTarget, 'substitute') && effect.target === 'target') {
               this.eventBus.emit({ kind: 'substitute-blocked', turn, target: effectTargetPos });
+              break;
+            }
+            // Misty Terrain prevents confusion on grounded pokemon
+            if (field.terrain === 'misty' && this.isGrounded(effectTarget)) {
+              this.eventBus.emit({ kind: 'fail', turn, user: userPos, reason: `The Misty Terrain prevents confusion!` });
               break;
             }
             addVolatileStatus(effectTarget, 'confusion');

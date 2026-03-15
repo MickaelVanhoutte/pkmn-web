@@ -56,4 +56,5 @@ export interface PokemonBattleState {
   chargeMoveId: MoveId | null;
   chargeMoveTargetPos: BattlePosition | null;
   choiceLocked: MoveId | null;
+  consecutiveProtectUse: number;
 }

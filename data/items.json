@@ -96,5 +96,12 @@
     "description": "Boosts Speed by 50% but locks into one move.",
     "category": "held",
     "effect": { "type": "held-choice", "value": 150 }
+  },
+  {
+    "id": "focus-sash",
+    "name": "Focus Sash",
+    "description": "Survives a hit that would KO from full HP. Consumed after use.",
+    "category": "held",
+    "effect": { "type": "held-focus-sash" }
   }
 ]

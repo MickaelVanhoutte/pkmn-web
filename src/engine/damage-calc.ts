@@ -15,7 +15,6 @@ export interface DamageCalcInput {
   isSpread: boolean;
   randomFactor: number;
   otherModifiers: number;
-  burnModifier: number;
 }
 
 export interface DamageCalcResult {
@@ -23,6 +22,21 @@ export interface DamageCalcResult {
   effectiveness: number;
   effectivenessLabel: 'immune' | 'not-very-effective' | 'neutral' | 'super-effective';
   isCritical: boolean;
+}
+
+/**
+ * Pokemon-round: round to nearest, 0.5 rounds down (matches game hardware).
+ */
+function pokeRound(n: number): number {
+  return (n % 1 > 0.5) ? Math.ceil(n) : Math.floor(n);
+}
+
+/**
+ * Apply a modifier with intermediate rounding, matching Showdown's chained modifier system.
+ * Each modifier is applied individually with a round after, to match the game's fixed-point arithmetic.
+ */
+function applyModifier(damage: number, modifier: number): number {
+  return pokeRound(damage * modifier);
 }
 
 export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
@@ -37,43 +51,45 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
     };
   }
 
-  const baseDamage = Math.floor(
+  let damage = Math.floor(
     ((2 * input.level / 5 + 2) * input.power * input.attack / input.defense) / 50,
   ) + 2;
 
-  let modifier = 1.0;
+  // Each modifier applied with intermediate rounding (Gen 5+ order)
 
-  // Doubles spread penalty
+  // 1. Doubles spread penalty
   if (input.isDoubles && input.isSpread) {
-    modifier *= 0.75;
+    damage = applyModifier(damage, 0.75);
   }
 
-  // Weather modifier
-  modifier *= getWeatherModifier(input.weather, input.moveType);
+  // 2. Weather modifier
+  const weatherMod = getWeatherModifier(input.weather, input.moveType);
+  if (weatherMod !== 1.0) {
+    damage = applyModifier(damage, weatherMod);
+  }
 
-  // Critical hit
+  // 3. Critical hit
   if (input.isCritical) {
-    modifier *= 1.5;
+    damage = applyModifier(damage, 1.5);
   }
 
-  // Random factor (0.85-1.00)
-  modifier *= input.randomFactor;
+  // 4. Random factor (0.85-1.00) — always floor
+  damage = Math.floor(damage * input.randomFactor);
 
-  // STAB
+  // 5. STAB
   if (input.stab) {
-    modifier *= 1.5;
+    damage = applyModifier(damage, 1.5);
   }
 
-  // Type effectiveness
-  modifier *= effectiveness;
+  // 6. Type effectiveness (can be 0.25, 0.5, 2, 4, etc.)
+  damage = Math.floor(damage * effectiveness);
 
-  // Burn (physical move while burned)
-  modifier *= input.burnModifier;
+  // 7. Other modifiers (abilities, items, screens, terrain)
+  if (input.otherModifiers !== 1.0) {
+    damage = applyModifier(damage, input.otherModifiers);
+  }
 
-  // Other (abilities, items, etc.)
-  modifier *= input.otherModifiers;
-
-  const damage = Math.max(1, Math.floor(baseDamage * modifier));
+  damage = Math.max(1, damage);
 
   return {
     damage,

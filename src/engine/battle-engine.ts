@@ -5,7 +5,8 @@ import type {
   BattleConfig, BattleState, BattlePhase, PlayerState, FieldState,
 } from '../types/battle';
 import { defaultSideState } from '../types/battle';
-import { createPokemonBattleState, getPokemonName, removeVolatileStatus, applyHeal } from '../model/pokemon';
+import { createPokemonBattleState, getPokemonName, removeVolatileStatus, hasVolatileStatus, applyHeal } from '../model/pokemon';
+import { getMove } from '../data/move-registry';
 import { createFieldState } from '../model/field';
 import { EventBus } from '../events/event-bus';
 import { SeededRNG } from './rng';
@@ -180,10 +181,30 @@ export class BattleEngine {
       this.processEndOfTurn();
     }
 
+    const currentTurn = this.state.turn;
+
     if (!this.state.isOver) {
+      // Reset consecutiveProtectUse for pokemon that didn't use Protect this turn
+      for (const player of this.state.players) {
+        for (const idx of player.activePokemon) {
+          const pokemon = player.team[idx];
+          if (pokemon && !pokemon.isFainted && !hasVolatileStatus(pokemon, 'protect')) {
+            pokemon.consecutiveProtectUse = 0;
+          }
+        }
+      }
+
+      this.eventBus.emit({ kind: 'turn-end', turn: currentTurn });
+
       // Check for forced switches
       const needsSwitch = this.checkForcedSwitches();
       if (needsSwitch.length > 0) {
+        for (const ns of needsSwitch) {
+          this.eventBus.emit({
+            kind: 'force-switch-needed', turn: currentTurn,
+            player: ns.player, slot: ns.slot,
+          });
+        }
         this.transitionTo('forced-switch');
       } else {
         this.state.turn++;
@@ -192,7 +213,6 @@ export class BattleEngine {
     }
 
     this.pendingActions.clear();
-    this.eventBus.emit({ kind: 'turn-end', turn: this.state.turn });
 
     return this.eventBus.getLog();
   }
@@ -219,10 +239,10 @@ export class BattleEngine {
       const winner = this.checkWinCondition();
       if (winner !== null) {
         this.state.isOver = true;
-        this.state.winner = winner;
+        this.state.winner = winner === 'draw' ? null : winner;
         this.eventBus.emit({
           kind: 'battle-end', turn: this.state.turn,
-          winner, reason: 'all-fainted',
+          winner: winner === 'draw' ? null : winner, reason: 'all-fainted',
         });
         this.transitionTo('battle-over');
       } else {
@@ -304,7 +324,12 @@ export class BattleEngine {
           this.eventBus.emit({ kind: 'screen-end', turn, side: p as PlayerIndex, screen: 'reflect' });
         }
       }
-      if (side.tailwind > 0) side.tailwind--;
+      if (side.tailwind > 0) {
+        side.tailwind--;
+        if (side.tailwind === 0) {
+          this.eventBus.emit({ kind: 'screen-end', turn, side: p as PlayerIndex, screen: 'tailwind' });
+        }
+      }
     }
 
     // Terrain end-of-turn: Grassy Terrain heals grounded pokemon 1/16 HP
@@ -341,14 +366,34 @@ export class BattleEngine {
       }
     }
 
+    // Trick Room tick
+    if (this.state.field.trickRoom > 0) {
+      this.state.field.trickRoom--;
+      if (this.state.field.trickRoom === 0) {
+        this.eventBus.emit({ kind: 'message', turn, text: 'The twisted dimensions returned to normal!' });
+      }
+    }
+
     // Check win condition
     const winner = this.checkWinCondition();
     if (winner !== null) {
       this.state.isOver = true;
-      this.state.winner = winner;
+      this.state.winner = winner === 'draw' ? null : winner;
       this.eventBus.emit({
         kind: 'battle-end', turn,
-        winner, reason: 'all-fainted',
+        winner: winner === 'draw' ? null : winner, reason: 'all-fainted',
+      });
+      this.transitionTo('battle-over');
+      return;
+    }
+
+    // maxTurns enforcement
+    if (this.state.config.maxTurns && turn >= this.state.config.maxTurns) {
+      this.state.isOver = true;
+      this.state.winner = null;
+      this.eventBus.emit({
+        kind: 'battle-end', turn,
+        winner: null, reason: 'turn-limit',
       });
       this.transitionTo('battle-over');
     }
@@ -376,14 +421,13 @@ export class BattleEngine {
     return needed;
   }
 
-  private checkWinCondition(): PlayerIndex | null {
-    for (let p = 0; p < 2; p++) {
-      const player = this.state.players[p as PlayerIndex];
-      const allFainted = player.team.every(pokemon => pokemon.isFainted);
-      if (allFainted) {
-        return (p === 0 ? 1 : 0) as PlayerIndex;
-      }
-    }
+  private checkWinCondition(): PlayerIndex | 'draw' | null {
+    const p0AllFainted = this.state.players[0].team.every(p => p.isFainted);
+    const p1AllFainted = this.state.players[1].team.every(p => p.isFainted);
+
+    if (p0AllFainted && p1AllFainted) return 'draw';
+    if (p0AllFainted) return 1 as PlayerIndex;
+    if (p1AllFainted) return 0 as PlayerIndex;
     return null;
   }
 
@@ -461,5 +505,92 @@ export class BattleEngine {
 
   onAny(handler: (event: BattleEvent) => void): () => void {
     return this.eventBus.onAny(handler);
+  }
+
+  /**
+   * Returns the available actions for a player in the current turn.
+   * A UI should use this to determine what moves, switches, etc. are legal.
+   */
+  getAvailableActions(player: PlayerIndex): {
+    slot: number;
+    canMove: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[];
+    canSwitch: { teamIndex: number; pokemonName: string; speciesId: string; currentHp: number; maxHp: number }[];
+  }[] {
+    const playerState = this.state.players[player];
+    const result: ReturnType<BattleEngine['getAvailableActions']> = [];
+
+    for (let s = 0; s < playerState.activePokemon.length; s++) {
+      const teamIdx = playerState.activePokemon[s];
+      const pokemon = playerState.team[teamIdx];
+      if (!pokemon || pokemon.isFainted) continue;
+
+      // Available moves
+      const canMove: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[] = [];
+      for (let mi = 0; mi < pokemon.moves.length; mi++) {
+        const ms = pokemon.moves[mi];
+        if (ms.currentPp <= 0) continue;
+        if (ms.disabled) continue;
+        // Choice lock: can only use the locked move
+        if (pokemon.choiceLocked && ms.moveId !== pokemon.choiceLocked) continue;
+        // Charge move: must continue charging
+        if (pokemon.chargeMoveId && ms.moveId !== pokemon.chargeMoveId) continue;
+
+        const moveData = getMove(ms.moveId);
+        canMove.push({
+          moveIndex: mi,
+          moveId: ms.moveId,
+          moveName: moveData.name,
+          moveType: moveData.type,
+          pp: ms.currentPp,
+          maxPp: ms.maxPp,
+        });
+      }
+
+      // Available switches
+      const canSwitch: { teamIndex: number; pokemonName: string; speciesId: string; currentHp: number; maxHp: number }[] = [];
+      for (let ti = 0; ti < playerState.team.length; ti++) {
+        const teamMember = playerState.team[ti];
+        if (teamMember.isFainted) continue;
+        if (teamMember.isActive) continue;
+        if (playerState.activePokemon.includes(ti)) continue;
+        canSwitch.push({
+          teamIndex: ti,
+          pokemonName: getPokemonName(teamMember),
+          speciesId: teamMember.species.id,
+          currentHp: teamMember.currentHp,
+          maxHp: teamMember.maxHp,
+        });
+      }
+
+      result.push({ slot: s, canMove, canSwitch });
+    }
+
+    return result;
+  }
+
+  /**
+   * Returns which player/slot pairs still need to submit a forced switch.
+   */
+  getPendingForcedSwitches(): { player: PlayerIndex; slot: number }[] {
+    if (this.state.phase !== 'forced-switch') return [];
+    return this.checkForcedSwitches();
+  }
+
+  /**
+   * Submit a forfeit for a player, ending the battle immediately.
+   */
+  forfeit(player: PlayerIndex): BattleEvent[] {
+    if (this.state.isOver) throw new Error('Battle is already over');
+
+    this.eventBus.clearLog();
+    const winner = (player === 0 ? 1 : 0) as PlayerIndex;
+    this.state.isOver = true;
+    this.state.winner = winner;
+    this.eventBus.emit({
+      kind: 'battle-end', turn: this.state.turn,
+      winner, reason: 'forfeit',
+    });
+    this.transitionTo('battle-over');
+    return this.eventBus.getLog();
   }
 }

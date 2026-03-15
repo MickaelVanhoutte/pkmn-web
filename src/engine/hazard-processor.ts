@@ -3,7 +3,7 @@ import type {
 } from '../types';
 import type { SideState } from '../types/battle';
 import { getTypeEffectiveness } from '../data/type-chart';
-import { applyDamage, getPokemonName } from '../model/pokemon';
+import { applyDamage, getPokemonName, setStatus } from '../model/pokemon';
 import type { EventBus } from '../events/event-bus';
 
 export class HazardProcessor {
@@ -18,8 +18,7 @@ export class HazardProcessor {
     if (pokemon.isFainted) return;
 
     const types = pokemon.species.types as TypeName[];
-    const isGrounded = !types.includes('flying');
-    // Note: Levitate immunity handled separately via ability check
+    const isGrounded = !types.includes('flying') && pokemon.ability !== 'levitate';
 
     // Stealth Rock: typed damage based on Rock effectiveness
     if (side.stealthRock) {
@@ -88,15 +87,16 @@ export class HazardProcessor {
       } else if (!pokemon.status) {
         // Steel types are immune to poison
         if (!types.includes('steel')) {
-          pokemon.status = 'poison';
-          pokemon.statusTurns = 0;
-          this.eventBus.emit({
-            kind: 'status-applied',
-            turn,
-            target: position,
-            status: 'poison',
-            pokemonName: getPokemonName(pokemon),
-          });
+          const applied = setStatus(pokemon, 'poison');
+          if (applied) {
+            this.eventBus.emit({
+              kind: 'status-applied',
+              turn,
+              target: position,
+              status: 'poison',
+              pokemonName: getPokemonName(pokemon),
+            });
+          }
         }
       }
     }

@@ -22,7 +22,8 @@ export type MajorStatus = 'burn' | 'paralysis' | 'freeze' | 'poison' | 'sleep';
 export type VolatileStatus =
   | 'confusion' | 'flinch' | 'protect' | 'substitute'
   | 'leechSeed' | 'encore' | 'taunt' | 'torment'
-  | 'chargeMove' | 'focusEnergy' | 'destinationBond';
+  | 'chargeMove' | 'focusEnergy' | 'destinyBond'
+  | 'semiInvulnerable';
 
 export type Weather = 'sun' | 'rain' | 'sandstorm' | 'hail';
 

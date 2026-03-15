@@ -2,7 +2,7 @@ import type {
   PokemonBattleState, BattlePosition, PlayerIndex, MoveData,
 } from '../types';
 import type { PlayerState, FieldState } from '../types/battle';
-import { clearVolatileStatuses, resetStatStages, cureStatus, getPokemonName } from '../model/pokemon';
+import { clearVolatileStatuses, resetStatStages, cureStatus, getPokemonName, hasVolatileStatus } from '../model/pokemon';
 import { getSide } from '../model/field';
 import { HazardProcessor } from './hazard-processor';
 import { AbilityDispatcher } from './ability-dispatcher';
@@ -31,8 +31,8 @@ export class SwitchProcessor {
 
     const position: BattlePosition = { player: player.index, slot };
 
-    // Switch out
-    this.switchOut(outgoing, position, turn);
+    // Switch out (skip ability effects for fainted pokemon)
+    this.switchOut(outgoing, position, turn, outgoing.isFainted);
 
     // Update active pokemon
     outgoing.isActive = false;
@@ -49,24 +49,28 @@ export class SwitchProcessor {
     pokemon: PokemonBattleState,
     position: BattlePosition,
     turn: number,
+    isFainted: boolean = false,
   ): void {
-    // Fire onSwitchOut abilities
-    this.abilityDispatcher.dispatch('onSwitchOut', pokemon, position, {
-      source: pokemon,
-    }, turn);
+    // Fainted pokemon don't trigger switch-out effects
+    if (!isFainted) {
+      // Fire onSwitchOut abilities
+      this.abilityDispatcher.dispatch('onSwitchOut', pokemon, position, {
+        source: pokemon,
+      }, turn);
 
-    // Natural Cure: heal status on switch out
-    if (pokemon.ability === 'natural-cure' && pokemon.status) {
-      const cured = cureStatus(pokemon);
-      if (cured) {
-        this.eventBus.emit({
-          kind: 'status-cured',
-          turn,
-          target: position,
-          status: cured,
-          pokemonName: getPokemonName(pokemon),
-          source: 'ability',
-        });
+      // Natural Cure: heal status on switch out
+      if (pokemon.ability === 'natural-cure' && pokemon.status) {
+        const cured = cureStatus(pokemon);
+        if (cured) {
+          this.eventBus.emit({
+            kind: 'status-cured',
+            turn,
+            target: position,
+            status: cured,
+            pokemonName: getPokemonName(pokemon),
+            source: 'ability',
+          });
+        }
       }
     }
 
@@ -80,6 +84,7 @@ export class SwitchProcessor {
     pokemon.chargeMoveId = null;
     pokemon.chargeMoveTargetPos = null;
     pokemon.choiceLocked = null;
+    pokemon.consecutiveProtectUse = 0;
 
     this.eventBus.emit({
       kind: 'switch-out',
@@ -103,7 +108,10 @@ export class SwitchProcessor {
       player: position.player,
       slot: position.slot,
       pokemonName: getPokemonName(pokemon),
+      speciesId: pokemon.species.id,
       teamIndex: pokemon.teamIndex,
+      currentHp: pokemon.currentHp,
+      maxHp: pokemon.maxHp,
     });
 
     // Apply entry hazards
@@ -120,34 +128,7 @@ export class SwitchProcessor {
     }, turn);
 
     // Process ability results
-    for (const result of results) {
-      if (result.action === 'set-weather') {
-        field.weather = result.weather;
-        field.weatherTurnsRemaining = 5;
-        this.eventBus.emit({
-          kind: 'weather-set',
-          turn,
-          weather: result.weather,
-          turns: 5,
-        });
-      } else if (result.action === 'boost-stat') {
-        // Intimidate: lower all opponents' attack
-        for (const opp of opponents) {
-          if (opp.isFainted) continue;
-          const oldStage = opp.statStages[result.stat];
-          opp.statStages[result.stat] = Math.max(-6, Math.min(6, oldStage + result.stages));
-          this.eventBus.emit({
-            kind: 'stat-change',
-            turn,
-            target: { player: position.player === 0 ? 1 : 0, slot: opp.slotIndex },
-            stat: result.stat,
-            stages: result.stages,
-            currentStage: opp.statStages[result.stat],
-            pokemonName: getPokemonName(opp),
-          });
-        }
-      }
-    }
+    this.processAbilityResults(results, position, field, opponents, turn);
   }
 
   sendOutInitial(
@@ -173,7 +154,10 @@ export class SwitchProcessor {
       player: player.index,
       slot,
       pokemonName: getPokemonName(pokemon),
+      speciesId: pokemon.species.id,
       teamIndex,
+      currentHp: pokemon.currentHp,
+      maxHp: pokemon.maxHp,
     });
 
     // Fire onSwitchIn abilities (no hazards on initial send-out)
@@ -183,6 +167,16 @@ export class SwitchProcessor {
       weather: field.weather,
     }, turn);
 
+    this.processAbilityResults(results, position, field, opponents, turn);
+  }
+
+  private processAbilityResults(
+    results: import('../types').AbilityHookResult[],
+    position: BattlePosition,
+    field: FieldState,
+    opponents: PokemonBattleState[],
+    turn: number,
+  ): void {
     for (const result of results) {
       if (result.action === 'set-weather') {
         field.weather = result.weather;
@@ -194,14 +188,34 @@ export class SwitchProcessor {
           turns: 5,
         });
       } else if (result.action === 'boost-stat') {
+        const oppPlayerIndex = (position.player === 0 ? 1 : 0) as PlayerIndex;
         for (const opp of opponents) {
           if (opp.isFainted) continue;
+          // Substitute blocks Intimidate stat drops
+          if (result.stages < 0 && hasVolatileStatus(opp, 'substitute')) {
+            this.eventBus.emit({
+              kind: 'substitute-blocked', turn,
+              target: { player: oppPlayerIndex, slot: opp.slotIndex },
+            });
+            continue;
+          }
+          // Check Clear Body / ability-based stat drop prevention
+          if (result.stages < 0 && this.abilityDispatcher.shouldPrevent('onStatChange', opp, {
+            source: opp,
+            statChange: { stat: result.stat, stages: result.stages },
+          })) {
+            this.eventBus.emit({
+              kind: 'message', turn,
+              text: `${getPokemonName(opp)}'s ${opp.ability} prevents stat reduction!`,
+            });
+            continue;
+          }
           const oldStage = opp.statStages[result.stat];
           opp.statStages[result.stat] = Math.max(-6, Math.min(6, oldStage + result.stages));
           this.eventBus.emit({
             kind: 'stat-change',
             turn,
-            target: { player: position.player === 0 ? 1 : 0, slot: opp.slotIndex },
+            target: { player: oppPlayerIndex, slot: opp.slotIndex },
             stat: result.stat,
             stages: result.stages,
             currentStage: opp.statStages[result.stat],

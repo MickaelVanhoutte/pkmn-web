@@ -16,7 +16,6 @@ describe('Damage Calculation', () => {
     isSpread: false,
     randomFactor: 1.0,
     otherModifiers: 1.0,
-    burnModifier: 1.0,
   };
 
   it('should calculate base damage correctly', () => {
@@ -67,12 +66,6 @@ describe('Damage Calculation', () => {
     expect(result.isCritical).toBe(true);
   });
 
-  it('should apply burn modifier', () => {
-    const result = calculateDamage({ ...baseDamageInput, burnModifier: 0.5 });
-    // 37 * 0.5 = 18.5 -> 18
-    expect(result.damage).toBe(18);
-  });
-
   it('should apply random factor', () => {
     const result = calculateDamage({ ...baseDamageInput, randomFactor: 0.85 });
     // 37 * 0.85 = 31.45 -> 31
@@ -85,8 +78,8 @@ describe('Damage Calculation', () => {
       isDoubles: true,
       isSpread: true,
     });
-    // 37 * 0.75 = 27.75 -> 27
-    expect(result.damage).toBe(27);
+    // Step-by-step rounding (Showdown-accurate): spread penalty applied and floored per step -> 28
+    expect(result.damage).toBe(28);
   });
 
   it('should always do at least 1 damage for non-immune hits', () => {

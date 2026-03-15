@@ -10,15 +10,15 @@ export function createBattleLog(): BattleLogComponent {
   const container = el('div', { class: 'battle-log' });
 
   function addEntry(text: string): void {
-    const entry = el('p', { class: 'log-entry' }, [text]);
-    container.appendChild(entry);
-    container.scrollTop = container.scrollHeight;
+    // Always log to browser console for full history
+    console.log(`[Battle] ${text}`);
+
+    // Show only the last message in the UI overlay
+    container.textContent = text;
   }
 
   function clear(): void {
-    while (container.firstChild) {
-      container.removeChild(container.firstChild);
-    }
+    container.textContent = '';
   }
 
   return { el: container, addEntry, clear };

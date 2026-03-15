@@ -23,7 +23,10 @@ export interface TargetPanelComponent {
 export function createTargetPanel(): TargetPanelComponent {
   const header = el('div', { class: 'target-panel-header' }, ['Choose a target']);
   const list = el('div', { class: 'target-list' });
-  const backBtn = el('button', { class: 'action-btn back' }, ['BACK']);
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-arrow-btn';
+  backBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
 
   const container = el('div', { class: 'target-panel' }, [header, list, backBtn]);
   container.style.display = 'none';

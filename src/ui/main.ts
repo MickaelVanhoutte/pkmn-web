@@ -45,3 +45,8 @@ const navigate: NavigateFn = (screen, params) => {
 }
 
 navigate('title');
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js').catch(() => {});
+}

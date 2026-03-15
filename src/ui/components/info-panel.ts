@@ -54,8 +54,8 @@ export function createInfoPanel(side: 'player' | 'opponent'): InfoPanelComponent
     maxHp: number;
     status: MajorStatus | null;
   }): void {
-    nameSpan.textContent = `[${data.name.toUpperCase()}]`;
-    levelSpan.textContent = `[Lv. ${data.level}]`;
+    nameSpan.textContent = data.name.toUpperCase();
+    levelSpan.textContent = `Lv. ${data.level}`;
     hpBar.update(data.currentHp, data.maxHp);
 
     if (data.status) {

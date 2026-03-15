@@ -59,17 +59,13 @@ export function showBattleScreen(
   const switchPanel: SwitchPanelComponent = createSwitchPanel();
   const targetPanel: TargetPanelComponent = createTargetPanel();
 
-  // Top bar: turn counter (left) + location name (right)
-  const turnCounter = el('span', { class: 'turn-counter' }, ['Turn 1']);
-  const locationName = bgName.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-  const locationLabel = el('span', { class: 'location-label' }, [`[${locationName.toUpperCase()}]`]);
-  const topBar = el('div', { class: 'battle-top-bar' }, [turnCounter, locationLabel]);
+  // Hidden turn counter (updated by controller, not displayed)
+  const turnCounter = el('span', { class: 'turn-counter' });
+  turnCounter.style.display = 'none';
 
   // ── Build DOM ──
   const arenaClasses = `battle-arena${isDoubles ? ' doubles' : ''}`;
   const arena = el('div', { class: arenaClasses });
-  arena.style.backgroundImage = `url('./backgrounds/${bgName}.png')`;
-  arena.appendChild(topBar);
 
   for (let s = 0; s < slotsPerSide; s++) {
     arena.appendChild(playerInfos[s].el);
@@ -78,15 +74,15 @@ export function showBattleScreen(
     arena.appendChild(opponentSprites[s].el);
   }
 
-  const bottomPanel = el('div', { class: 'battle-bottom' }, [
-    battleLog.el,
+  const actionBox = el('div', { class: 'action-box' }, [
     actionMenu.el,
     movePanel.el,
-    switchPanel.el,
     targetPanel.el,
   ]);
 
-  const battleContainer = el('div', { class: 'battle-container' }, [arena, bottomPanel]);
+  const battleContainer = el('div', { class: 'battle-container' }, [arena, battleLog.el, actionBox, switchPanel.el]);
+  // Background on container so it extends behind buttons
+  battleContainer.style.backgroundImage = `url('./backgrounds/${bgName}.png')`;
   container.appendChild(battleContainer);
 
   // ── Setup animation system ──

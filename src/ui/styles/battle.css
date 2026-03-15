@@ -14,15 +14,17 @@
   max-width: 960px;
   margin: 0 auto;
   overflow: hidden;
-  background: #2C2C2C;
+  background-color: #2C2C2C;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  image-rendering: -webkit-crisp-edges;
   display: flex;
   flex-direction: column;
   font-size: clamp(7px, 1.8vw, 10px);
-  /* Spec: 2px solid light grey outer border with 1px dark inset bevel */
-  border: 2px solid rgba(180, 180, 180, 0.35);
+  border: none;
   border-radius: 0;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 
 @media (min-width: 600px) {
@@ -81,9 +83,9 @@
 
 .battle-arena {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -103,10 +105,10 @@
 
 /* -- Singles layout -- */
 
-/* Player sprite: bottom-left, feet on the ground platform */
+/* Player sprite: bottom-left, pushed down into the transparent bottom area */
 .sprite-slot.player-0 {
   left: 10%;
-  bottom: 6%;
+  bottom: -6%;
   width: 30%;
   height: 50%;
 }
@@ -114,7 +116,7 @@
 /* Opponent sprite: upper-right, on the far platform */
 .sprite-slot.opponent-0 {
   right: 8%;
-  top: 16%;
+  top: 22%;
   width: 24%;
   height: 44%;
 }
@@ -123,8 +125,8 @@
 
 /* Player second slot: shifted right of player-0 */
 .sprite-slot.player-1 {
-  left: 30%;
-  bottom: 2%;
+  left: 25%;
+  bottom: 4%;
   width: 26%;
   height: 45%;
 }
@@ -132,43 +134,43 @@
 /* Opponent second slot: shifted left of opponent-0 */
 .sprite-slot.opponent-1 {
   right: 28%;
-  top: 14%;
+  top: 20%;
   width: 22%;
   height: 40%;
 }
 
 /* When doubles is active, pull primary slots slightly outward */
 .battle-arena.doubles .sprite-slot.player-0 {
-  left: 4%;
-  bottom: 8%;
+  left: 3%;
+  bottom: 12%;
   width: 26%;
 }
 
 .battle-arena.doubles .sprite-slot.opponent-0 {
   right: 4%;
-  top: 18%;
+  top: 24%;
   width: 22%;
 }
 
 /* -- Mobile landscape: push sprites lower in the short arena -- */
 @media (max-height: 500px) {
   .sprite-slot.player-0 {
-    bottom: -2%;
+    bottom: 5%;
   }
   .sprite-slot.player-1 {
-    bottom: -4%;
+    bottom: 4%;
   }
   .sprite-slot.opponent-0 {
-    top: 28%;
+    top: 18%;
   }
   .sprite-slot.opponent-1 {
-    top: 26%;
+    top: 12%;
   }
   .battle-arena.doubles .sprite-slot.player-0 {
-    bottom: 0%;
+    bottom: 6%;
   }
   .battle-arena.doubles .sprite-slot.opponent-0 {
-    top: 30%;
+    top: 17%;
   }
 }
 
@@ -222,27 +224,17 @@
 }
 
 
-/* ── Bottom panel ────────────────────────────────────────────────────────── */
+/* ── Action box: 50% width pinned bottom-right ─────────────────────────── */
 
-.battle-bottom {
-  flex: 0 0 25%;
-  display: flex;
-  min-height: 120px;
-  background: rgba(44, 44, 44, 0.95);
-  border-top: 2px solid rgba(180, 180, 180, 0.35);
-  position: relative;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
-}
-
-/* Inner highlight line */
-.battle-bottom::after {
-  content: '';
+.action-box {
   position: absolute;
-  top: 0;
-  left: 0;
+  bottom: 0;
   right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  z-index: 11;
+  min-height: 80px;
 }
 
 /* ==========================================================================

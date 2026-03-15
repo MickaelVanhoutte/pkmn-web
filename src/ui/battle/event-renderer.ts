@@ -1,5 +1,5 @@
 import type { BattleEvent } from '@/types/events';
-import type { PlayerIndex } from '@/types/common';
+import type { PlayerIndex, BattlePosition } from '@/types/common';
 
 export interface EventUIUpdate {
   logText?: string;
@@ -31,6 +31,29 @@ export interface EventUIUpdate {
   };
   playCry?: string;
   playMoveSfx?: string;
+  animation?: {
+    moveId: string;
+    attacker: BattlePosition;
+    targets: BattlePosition[];
+    isCharge?: boolean;
+  };
+  hitFlash?: {
+    player: PlayerIndex;
+    slot: number;
+  };
+  /** Special substitute choreography — handled by controller, not by spriteUpdate */
+  substituteAnim?: {
+    action: 'create' | 'break';
+    target: BattlePosition;
+  };
+  weatherEffect?: {
+    action: 'start' | 'stop';
+    weather: string;
+  };
+  terrainEffect?: {
+    action: 'start' | 'stop';
+    terrain: string;
+  };
   delay?: number;
 }
 
@@ -171,8 +194,12 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
         logText: event.user.player === 0
           ? `${event.moveName}!`
           : `The opposing Pokemon used ${event.moveName}!`,
-        playMoveSfx: event.moveName,
-        delay: 400,
+        animation: {
+          moveId: event.moveId,
+          attacker: event.user,
+          targets: event.targets,
+        },
+        delay: 100, // Short delay — animation handles timing
       };
 
     case 'damage': {
@@ -210,6 +237,10 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           currentHp: event.currentHp,
           maxHp: event.maxHp,
         },
+        hitFlash: event.source === 'move' ? {
+          player: event.target.player,
+          slot: event.target.slot,
+        } : undefined,
         delay: 300,
       };
     }
@@ -362,6 +393,10 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'weather-set':
       return {
         logText: weatherStartText(event.weather),
+        weatherEffect: {
+          action: 'start',
+          weather: event.weather,
+        },
         delay: 500,
       };
 
@@ -380,6 +415,10 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'weather-end':
       return {
         logText: weatherEndText(event.weather),
+        weatherEffect: {
+          action: 'stop',
+          weather: event.weather,
+        },
         delay: 400,
       };
 
@@ -501,29 +540,21 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'substitute-created':
       return {
         logText: 'A substitute was created!',
-        spriteUpdate: {
-          player: event.target.player,
-          slot: event.target.slot,
-          action: 'substitute',
+        substituteAnim: {
+          action: 'create',
+          target: event.target,
         },
-        hpUpdate: {
-          player: event.target.player,
-          slot: event.target.slot,
-          currentHp: 0, // Will be updated by a separate damage/HP event
-          maxHp: 0,
-        },
-        delay: 500,
+        delay: 100, // Short delay — animation handles timing
       };
 
     case 'substitute-broken':
       return {
         logText: "The substitute took the hit and broke!",
-        spriteUpdate: {
-          player: event.target.player,
-          slot: event.target.slot,
-          action: 'unsubstitute',
+        substituteAnim: {
+          action: 'break',
+          target: event.target,
         },
-        delay: 500,
+        delay: 100, // Short delay — animation handles timing
       };
 
     case 'substitute-blocked':
@@ -565,7 +596,13 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'charging':
       return {
         logText: `${event.moveName} is charging up!`,
-        delay: 500,
+        animation: {
+          moveId: event.moveId,
+          attacker: event.user,
+          targets: [],
+          isCharge: true,
+        },
+        delay: 100,
       };
 
     case 'force-switch':
@@ -583,12 +620,20 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'terrain-set':
       return {
         logText: `${terrainName(event.terrain)} covers the battlefield!`,
+        terrainEffect: {
+          action: 'start',
+          terrain: event.terrain,
+        },
         delay: 500,
       };
 
     case 'terrain-end':
       return {
         logText: `The ${terrainName(event.terrain)} faded.`,
+        terrainEffect: {
+          action: 'stop',
+          terrain: event.terrain,
+        },
         delay: 400,
       };
 

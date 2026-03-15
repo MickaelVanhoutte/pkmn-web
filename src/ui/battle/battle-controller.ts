@@ -6,6 +6,9 @@ import type { PokemonBattleState } from '@/types/pokemon';
 import { renderEvent, type EventUIUpdate } from './event-renderer';
 import { chooseAIActions } from '../ai/simple-ai';
 import { audioManager } from '../util/audio';
+import type { MoveAnimationPlayer } from '../animation/move-animation-player';
+import type { SpriteAnimator } from '../animation/sprite-animator';
+import { getMoveAnimation, getChargeAnimation } from '../animation/defs';
 
 // The UI components this controller needs to interact with
 export interface BattleUI {
@@ -43,11 +46,25 @@ export class BattleController {
   private ui: BattleUI;
   private eventDelay: number;
   private cachedInfo: Map<string, CachedPokemonInfo> = new Map();
+  private animPlayer: MoveAnimationPlayer | null = null;
+  private spriteAnimator: SpriteAnimator | null = null;
 
   constructor(config: BattleConfig, ui: BattleUI, eventDelay?: number) {
     this.engine = new BattleEngine(config);
     this.ui = ui;
     this.eventDelay = eventDelay ?? 400;
+  }
+
+  setAnimationPlayer(player: MoveAnimationPlayer): void {
+    this.animPlayer = player;
+  }
+
+  setSpriteAnimator(animator: SpriteAnimator): void {
+    this.spriteAnimator = animator;
+  }
+
+  getAnimationPlayer(): MoveAnimationPlayer | null {
+    return this.animPlayer;
   }
 
   async start(): Promise<void> {
@@ -260,6 +277,23 @@ export class BattleController {
       this.ui.battleLog.addEntry(update.logText);
     }
 
+    // Play move animation (before HP changes for visual sequencing)
+    if (update.animation && this.animPlayer) {
+      const { moveId, attacker, targets, isCharge } = update.animation;
+      const def = isCharge
+        ? getChargeAnimation(moveId)
+        : getMoveAnimation(moveId);
+      if (def) {
+        await this.animPlayer.play(def, attacker, targets);
+      }
+    }
+
+    // Hit flash on damage from moves
+    if (update.hitFlash && this.spriteAnimator) {
+      const { player, slot } = update.hitFlash;
+      this.spriteAnimator.flash({ player, slot });
+    }
+
     // HP update
     if (update.hpUpdate) {
       const { player, slot, currentHp, maxHp } = update.hpUpdate;
@@ -279,6 +313,25 @@ export class BattleController {
             status: cached.status,
           });
         }
+      }
+    }
+
+    // Substitute choreography (slide out → swap sprite → slide in)
+    if (update.substituteAnim && this.animPlayer && this.spriteAnimator) {
+      const { action, target } = update.substituteAnim;
+      const side = target.player === 0 ? 'player' : 'opponent';
+      const sprite = this.ui.sprites[side][target.slot];
+
+      if (action === 'create' && sprite) {
+        // Pokemon is already off-screen (from the move animation's slide-out).
+        // Swap to substitute sprite, then slide substitute in.
+        sprite.showSubstitute();
+        await this.spriteAnimator.slideIn(target, 350);
+      } else if (action === 'break' && sprite) {
+        // Slide substitute off-screen, swap back to real pokemon, slide in.
+        await this.spriteAnimator.slideOut(target, 300);
+        sprite.hideSubstitute();
+        await this.spriteAnimator.slideIn(target, 300);
       }
     }
 
@@ -360,6 +413,22 @@ export class BattleController {
           status: cached.status,
         });
         panel.show();
+      }
+    }
+
+    // Weather/Terrain persistent effects
+    if (update.weatherEffect && this.animPlayer) {
+      if (update.weatherEffect.action === 'start') {
+        await this.animPlayer.startWeather(update.weatherEffect.weather);
+      } else {
+        this.animPlayer.stopWeather();
+      }
+    }
+    if (update.terrainEffect && this.animPlayer) {
+      if (update.terrainEffect.action === 'start') {
+        await this.animPlayer.startTerrain(update.terrainEffect.terrain);
+      } else {
+        this.animPlayer.stopTerrain();
       }
     }
 

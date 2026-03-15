@@ -39,6 +39,10 @@ class AudioManager {
     await this.play(`./audio/move-effects/${moveName}.mp3`);
   }
 
+  async playMoveSfxPart(moveName: string, part: number): Promise<void> {
+    await this.play(`./audio/move-effects/${moveName} part ${part}.mp3`);
+  }
+
   setVolume(v: number): void {
     this._volume = Math.max(0, Math.min(1, v));
   }

@@ -12,7 +12,14 @@ export interface ActionMenuComponent {
 
 export function createActionMenu(): ActionMenuComponent {
   const fightBtn = el('button', { class: 'action-btn fight' }, ['FIGHT']);
-  const pokemonBtn = el('button', { class: 'action-btn pokemon' }, ['PKMn']);
+
+  // PkMn with subscript k and n to match GBA style
+  const pkmnP = el('span', { class: 'pkmn-big' }, ['P']);
+  const pkmnK = el('span', { class: 'pkmn-sub' }, ['k']);
+  const pkmnM = el('span', { class: 'pkmn-big' }, ['M']);
+  const pkmnN = el('span', { class: 'pkmn-sub' }, ['n']);
+  const pokemonBtn = el('button', { class: 'action-btn pokemon' }, [pkmnP, pkmnK, pkmnM, pkmnN]);
+
   const bagBtn = el('button', { class: 'action-btn bag' }, ['BAG']);
   const runBtn = el('button', { class: 'action-btn run' }, ['RUN']);
 

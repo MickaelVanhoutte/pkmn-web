@@ -342,7 +342,8 @@ export class BattleController {
       const sprite = this.ui.sprites[side][slot];
 
       if (action === 'switch-in' && sprite) {
-        // 1. Set sprite image (hidden — switchInAppear will make it visible)
+        // 1. Hide sprite, then set image (so it doesn't flash before pokeball throw)
+        sprite.setVisible(false);
         if (speciesId) sprite.updateSprite(speciesId, player === 0 ? 'back' : 'front');
         // 2. Pokeball throw on canvas (~500ms)
         if (this.animPlayer) await this.animPlayer.playPokeballThrow(player, slot, 500);

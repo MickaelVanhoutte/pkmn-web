@@ -15,7 +15,12 @@ import { MoveAnimationPlayer } from '../animation/move-animation-player';
 import { IS_DEBUG } from '../util/debug';
 import type { NavigateFn } from '../main';
 
-const BACKGROUNDS = ['bg-grassland', 'bg-cave', 'bg-ocean', 'bg-mountain', 'bg-forest'];
+const BACKGROUNDS = [
+  'beach', 'bridge-town', 'building-trainer-tower', 'cave', 'desert',
+  'dive', 'forest', 'grass', 'graveyard', 'indoors', 'lab', 'lake',
+  'neutral', 'rocky', 'route', 'snow-cave', 'snow-mountain', 'snow',
+  'space', 'volcano-cave',
+];
 
 export function showBattleScreen(
   container: HTMLElement,
@@ -27,7 +32,7 @@ export function showBattleScreen(
   const slotsPerSide = isDoubles ? 2 : 1;
 
   // Pick random background
-  const bgClass = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
+  const bgName = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)];
 
   // ── Create UI components ──
   const playerSprites: SpriteComponent[] = [];
@@ -52,13 +57,16 @@ export function showBattleScreen(
   const movePanel: MovePanelComponent = createMovePanel();
   const switchPanel: SwitchPanelComponent = createSwitchPanel();
 
-  // Turn counter
+  // Top bar: turn counter (left) + location name (right)
   const turnCounter = el('span', { class: 'turn-counter' }, ['Turn 1']);
-  const topBar = el('div', { class: 'battle-top-bar' }, [turnCounter]);
+  const locationName = bgName.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const locationLabel = el('span', { class: 'location-label' }, [`[${locationName.toUpperCase()}]`]);
+  const topBar = el('div', { class: 'battle-top-bar' }, [turnCounter, locationLabel]);
 
   // ── Build DOM ──
-  const arenaClasses = `battle-arena ${bgClass}${isDoubles ? ' doubles' : ''}`;
+  const arenaClasses = `battle-arena${isDoubles ? ' doubles' : ''}`;
   const arena = el('div', { class: arenaClasses });
+  arena.style.backgroundImage = `url('./backgrounds/${bgName}.png')`;
   arena.appendChild(topBar);
 
   for (let s = 0; s < slotsPerSide; s++) {

@@ -45,6 +45,9 @@ export class MoveAnimationPlayer {
   private activeTerrainEffect: { stop: () => void; render: RenderCallback } | null = null;
   private rafId: number | null = null;
 
+  /** Reference arena width used to design animation scale values. */
+  private static readonly REF_WIDTH = 800;
+
   constructor(
     canvas: CanvasOverlay,
     posResolver: PositionResolver,
@@ -59,6 +62,11 @@ export class MoveAnimationPlayer {
 
   get isPlaying(): boolean {
     return this._playing;
+  }
+
+  /** Scale factor relative to reference arena width — keeps animations proportional. */
+  private get arenaScale(): number {
+    return Math.max(0.4, this.arena.clientWidth / MoveAnimationPlayer.REF_WIDTH);
   }
 
   /**
@@ -255,17 +263,22 @@ export class MoveAnimationPlayer {
   ): Promise<void> {
     const pos = this.posResolver.resolve(phase.at, attacker, defender);
     const img = await preloadImage(phase.sheet.src);
+    const s = this.arenaScale;
+
+    const scaledOffset = phase.offset
+      ? { x: phase.offset.x * s, y: phase.offset.y * s }
+      : undefined;
 
     const { render, promise } = createSpritesheetRenderer(
       phase.sheet,
       img,
       pos,
       {
-        scale: phase.scale,
+        scale: (phase.scale ?? 1) * s,
         tint: phase.tint,
         blend: phase.blend,
         loops: phase.loops,
-        offset: phase.offset,
+        offset: scaledOffset,
       },
     );
 
@@ -283,16 +296,17 @@ export class MoveAnimationPlayer {
     const from = this.posResolver.resolve(phase.from, attacker, defender);
     const to = this.posResolver.resolve(phase.to, attacker, defender);
     const img = await preloadImage(phase.image);
+    const s = this.arenaScale;
 
     const { render, promise } = createProjectileRenderer(img, {
       from,
       to,
       duration: phase.duration,
-      scale: phase.scale,
+      scale: (phase.scale ?? 1) * s,
       tint: phase.tint,
       trail: phase.trail,
       trailCount: phase.trailCount,
-      arc: phase.arc,
+      arc: (phase.arc ?? 0) * s,
       blend: phase.blend,
       sheet: phase.sheet ? {
         frameSize: phase.sheet.frameSize,
@@ -314,10 +328,17 @@ export class MoveAnimationPlayer {
   ): Promise<void> {
     const origin = this.posResolver.resolve(phase.origin, attacker, defender);
     const img = await preloadImage(phase.image);
+    const s = this.arenaScale;
+
+    const scaledScale: [number, number] | undefined = phase.scale
+      ? [phase.scale[0] * s, phase.scale[1] * s]
+      : undefined;
 
     const { render, promise } = createParticleRenderer(img, {
       ...phase,
       origin,
+      spread: (phase.spread ?? 30) * s,
+      scale: scaledScale,
     });
 
     this.activeRenderers.add(render);
@@ -359,7 +380,7 @@ export class MoveAnimationPlayer {
   private async executeScreenShake(
     phase: AnimationPhase & { type: 'screen-shake' },
   ): Promise<void> {
-    const intensity = phase.intensity;
+    const intensity = phase.intensity * this.arenaScale;
     const axis = phase.axis ?? 'both';
     const start = performance.now();
 
@@ -410,6 +431,7 @@ export class MoveAnimationPlayer {
     const startTime = performance.now();
     const half = phase.duration / 2;
     const total = phase.duration;
+    const scaledRadius = phase.radius * this.arenaScale;
 
     await this.addRenderer((ctx) => {
       const elapsed = performance.now() - startTime;
@@ -419,7 +441,7 @@ export class MoveAnimationPlayer {
         ? phase.intensity * (elapsed / half)
         : phase.intensity * (1 - (elapsed - half) / half);
 
-      this.drawLightingGradient(ctx, pos, phase.radius, phase.color, Math.max(0, alpha));
+      this.drawLightingGradient(ctx, pos, scaledRadius, phase.color, Math.max(0, alpha));
       return true;
     });
   }
@@ -488,7 +510,8 @@ export class MoveAnimationPlayer {
 
     const img = await preloadImage(imgSrc);
     const pos = this.posResolver.getSlotCenter(who.player, who.slot);
-    const spacing = 15;
+    const s = this.arenaScale;
+    const spacing = 15 * s;
     const startTime = performance.now();
 
     await this.addRenderer((ctx) => {
@@ -507,8 +530,8 @@ export class MoveAnimationPlayer {
         ctx.globalAlpha = ghostAlpha;
         const ghostX = pos.x - offset * (who.player === 0 ? -1 : 1);
         const ghostY = pos.y + offset * 0.3;
-        const w = img.width * 0.8;
-        const h = img.height * 0.8;
+        const w = img.width * 0.8 * s;
+        const h = img.height * 0.8 * s;
         ctx.drawImage(img, ghostX - w / 2, ghostY - h / 2, w, h);
         ctx.restore();
       }
@@ -592,18 +615,19 @@ export class MoveAnimationPlayer {
     const img = await preloadImage('./fx/pokeball.png');
     const arenaSize = this.posResolver.getArenaSize();
     const target = this.posResolver.getSlotCenter(player, slot);
+    const s = this.arenaScale;
 
     // Start position: off-screen on the trainer's side
     const start: CanvasPoint = player === 0
-      ? { x: -30, y: arenaSize.height * 0.8 }
-      : { x: arenaSize.width + 30, y: arenaSize.height * 0.15 };
+      ? { x: -30 * s, y: arenaSize.height * 0.8 }
+      : { x: arenaSize.width + 30 * s, y: arenaSize.height * 0.15 };
 
     // End position: pokemon slot center, adjusted down slightly (base of pokemon)
-    const end: CanvasPoint = { x: target.x, y: target.y + 15 };
+    const end: CanvasPoint = { x: target.x, y: target.y + 15 * s };
 
-    const arcHeight = 80;
+    const arcHeight = 80 * s;
     const startTime = performance.now();
-    const displayScale = 2; // 24px * 2 = 48px display
+    const displayScale = 2 * s;
 
     // Pokeball arc animation
     await this.addRenderer((ctx) => {
@@ -646,21 +670,22 @@ export class MoveAnimationPlayer {
     const img = await preloadImage('./fx/pokeball.png');
     const arenaSize = this.posResolver.getArenaSize();
     const origin = this.posResolver.getSlotCenter(player, slot);
+    const s = this.arenaScale;
 
     // Start position: at the pokemon
-    const start: CanvasPoint = { x: origin.x, y: origin.y + 15 };
+    const start: CanvasPoint = { x: origin.x, y: origin.y + 15 * s };
 
     // End position: off-screen on the trainer's side
     const end: CanvasPoint = player === 0
-      ? { x: -30, y: arenaSize.height * 0.8 }
-      : { x: arenaSize.width + 30, y: arenaSize.height * 0.15 };
+      ? { x: -30 * s, y: arenaSize.height * 0.8 }
+      : { x: arenaSize.width + 30 * s, y: arenaSize.height * 0.15 };
 
     // Brief pop flash at pokemon position (pokeball materializes)
     await this.playPopFlash(start, 100);
 
-    const arcHeight = 60;
+    const arcHeight = 60 * s;
     const startTime = performance.now();
-    const displayScale = 2;
+    const displayScale = 2 * s;
 
     // Pokeball arc animation (reverse — from pokemon to off-screen)
     await this.addRenderer((ctx) => {
@@ -696,7 +721,7 @@ export class MoveAnimationPlayer {
    */
   private async playPopFlash(pos: CanvasPoint, duration: number): Promise<void> {
     const startTime = performance.now();
-    const maxRadius = 35;
+    const maxRadius = 35 * this.arenaScale;
 
     await this.addRenderer((ctx) => {
       const elapsed = performance.now() - startTime;

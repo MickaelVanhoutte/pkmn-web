@@ -27,17 +27,25 @@ export function createInfoPanel(side: 'player' | 'opponent'): InfoPanelComponent
   const nameSpan = el('span', { class: 'pokemon-name' });
   const levelSpan = el('span', { class: 'pokemon-level' });
 
-  const hpBar: HpBarComponent = createHpBar(0, 1);
-
   const statusBadge = el('span', { class: 'status-badge' });
   statusBadge.style.display = 'none';
 
-  const root = el('div', { class: `info-panel ${side}` }, [
-    nameSpan,
-    levelSpan,
-    hpBar.el,
-    statusBadge,
-  ]);
+  const headerRow = el('div', { class: 'info-header' }, [nameSpan, statusBadge, levelSpan]);
+
+  const isPlayer = side === 'player';
+  const hpBar: HpBarComponent = createHpBar(0, 1, { showText: isPlayer });
+
+  const children: HTMLElement[] = [headerRow, hpBar.el];
+
+  // EXP bar — player only
+  let expFill: HTMLElement | null = null;
+  if (isPlayer) {
+    expFill = el('div', { class: 'exp-bar-fill' });
+    const expTrack = el('div', { class: 'exp-bar-track' }, [expFill]);
+    children.push(expTrack);
+  }
+
+  const root = el('div', { class: `info-panel ${side}` }, children);
 
   function update(data: {
     name: string;
@@ -46,8 +54,8 @@ export function createInfoPanel(side: 'player' | 'opponent'): InfoPanelComponent
     maxHp: number;
     status: MajorStatus | null;
   }): void {
-    nameSpan.textContent = data.name;
-    levelSpan.textContent = `Lv.${data.level}`;
+    nameSpan.textContent = `[${data.name.toUpperCase()}]`;
+    levelSpan.textContent = `[Lv. ${data.level}]`;
     hpBar.update(data.currentHp, data.maxHp);
 
     if (data.status) {

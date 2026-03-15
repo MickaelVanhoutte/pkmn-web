@@ -7,6 +7,7 @@ import { tween, getEasing, delay } from './tween';
  * Handles lunges, shakes, hit flashes, and other sprite movements.
  */
 export class SpriteAnimator {
+  private static readonly REF_WIDTH = 800;
   private slots: Map<string, HTMLElement> = new Map();
   private posResolver: PositionResolver;
   private arena: HTMLElement;
@@ -14,6 +15,11 @@ export class SpriteAnimator {
   constructor(arena: HTMLElement, posResolver: PositionResolver) {
     this.arena = arena;
     this.posResolver = posResolver;
+  }
+
+  /** Scale factor relative to reference arena width — keeps animations proportional. */
+  private get arenaScale(): number {
+    return Math.max(0.4, this.arena.clientWidth / SpriteAnimator.REF_WIDTH);
   }
 
   registerSlot(player: number, slot: number, el: HTMLElement): void {
@@ -63,12 +69,13 @@ export class SpriteAnimator {
     const el = this.getSlot(who);
     if (!el) return;
 
+    const scaledIntensity = intensity * this.arenaScale;
     const easing = getEasing('linear');
     const shakes = Math.floor(duration / 50);
 
     await tween(0, shakes, duration, easing, (t) => {
       const phase = Math.sin(t * Math.PI * 2 * 3);
-      el.style.transform = `translateX(${phase * intensity}px)`;
+      el.style.transform = `translateX(${phase * scaledIntensity}px)`;
     });
 
     el.style.transform = '';
@@ -81,11 +88,12 @@ export class SpriteAnimator {
 
     const half = duration / 2;
 
-    await tween(0, -15, half, getEasing('easeOutQuad'), (y) => {
+    const hopHeight = -15 * this.arenaScale;
+    await tween(0, hopHeight, half, getEasing('easeOutQuad'), (y) => {
       el.style.transform = `translateY(${y}px)`;
     });
 
-    await tween(-15, 0, half, getEasing('easeInQuad'), (y) => {
+    await tween(hopHeight, 0, half, getEasing('easeInQuad'), (y) => {
       el.style.transform = `translateY(${y}px)`;
     });
 
@@ -97,6 +105,7 @@ export class SpriteAnimator {
     const el = this.getSlot(who);
     if (!el) return;
 
+    const scaledIntensity = intensity * this.arenaScale;
     const start = performance.now();
 
     return new Promise((resolve) => {
@@ -108,8 +117,8 @@ export class SpriteAnimator {
           return;
         }
 
-        const dx = (Math.random() - 0.5) * intensity * 2;
-        const dy = (Math.random() - 0.5) * intensity * 2;
+        const dx = (Math.random() - 0.5) * scaledIntensity * 2;
+        const dy = (Math.random() - 0.5) * scaledIntensity * 2;
         el!.style.transform = `translate(${dx}px, ${dy}px)`;
         requestAnimationFrame(tick);
       }
@@ -123,8 +132,9 @@ export class SpriteAnimator {
     const el = this.getSlot(who);
     if (!el) return;
 
+    const flyDist = 150 * this.arenaScale;
     el.style.transition = `transform ${duration}ms ease-in, opacity ${duration}ms ease-in`;
-    el.style.transform = 'translateY(-150px) scale(0.5)';
+    el.style.transform = `translateY(-${flyDist}px) scale(0.5)`;
     el.style.opacity = '0';
 
     await delay(duration);
@@ -136,8 +146,9 @@ export class SpriteAnimator {
     const el = this.getSlot(who);
     if (!el) return;
 
+    const flyDist = 150 * this.arenaScale;
     el.style.opacity = '1';
-    el.style.transform = 'translateY(-150px) scale(0.5)';
+    el.style.transform = `translateY(-${flyDist}px) scale(0.5)`;
 
     // Force reflow
     el.offsetHeight;
@@ -212,7 +223,7 @@ export class SpriteAnimator {
 
     // Player pokemon slides left, opponent slides right
     const direction = who.player === 0 ? -1 : 1;
-    const distance = 300;
+    const distance = 300 * this.arenaScale;
 
     el.style.transition = `transform ${duration}ms ease-in, opacity ${duration * 0.8}ms ease-in`;
     el.style.transform = `translateX(${direction * distance}px)`;
@@ -368,8 +379,9 @@ export class SpriteAnimator {
 
     // Phase 2: Fall down + fade out
     const fallDuration = duration - 200;
+    const fallDist = 150 * this.arenaScale;
     await Promise.all([
-      tween(0, 150, fallDuration, getEasing('easeInCubic'), (y) => {
+      tween(0, fallDist, fallDuration, getEasing('easeInCubic'), (y) => {
         el.style.transform = `translateY(${y}px)`;
       }),
       tween(1, 0, fallDuration, getEasing('easeInQuad'), (a) => {

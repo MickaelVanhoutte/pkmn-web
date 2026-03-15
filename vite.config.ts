@@ -7,11 +7,5 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
-  build: {
-    lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'PokemonEngine',
-      fileName: 'pokemon-engine',
-    },
-  },
+  base: './',
 });

@@ -1,0 +1,437 @@
+/* ==========================================================================
+   Battle Scene Layout
+   Fixed aspect-ratio container with arena + bottom panel.
+   Supports singles (1v1) and doubles (2v2) sprite positioning.
+   ========================================================================== */
+
+/* ── Outer container ─────────────────────────────────────────────────────── */
+
+.battle-container {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 10 / 9;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--bg-dark);
+  border: 2px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  display: flex;
+  flex-direction: column;
+  font-size: 8px;
+}
+
+/* ── Top info bar (turn counter, etc.) ───────────────────────────────────── */
+
+.battle-top-bar {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.turn-counter {
+  font-size: 7px;
+  color: var(--text-secondary);
+  text-shadow: var(--text-shadow);
+  background: var(--panel-bg);
+  padding: 3px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--panel-border);
+}
+
+/* ── Arena ────────────────────────────────────────────────────────────────── */
+
+.battle-arena {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Sprite slots ────────────────────────────────────────────────────────── */
+
+.sprite-slot {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 2;
+}
+
+/* -- Singles layout -- */
+
+/* Player sprite: bottom-left quadrant */
+.sprite-slot.player-0 {
+  left: 8%;
+  bottom: 8%;
+  width: 35%;
+  height: 50%;
+}
+
+/* Opponent sprite: top-right quadrant */
+.sprite-slot.opponent-0 {
+  right: 10%;
+  top: 14%;
+  width: 28%;
+  height: 40%;
+}
+
+/* -- Doubles extra slots -- */
+
+/* Player second slot: shifted right of player-0 */
+.sprite-slot.player-1 {
+  left: 30%;
+  bottom: 4%;
+  width: 30%;
+  height: 45%;
+}
+
+/* Opponent second slot: shifted left of opponent-0 */
+.sprite-slot.opponent-1 {
+  right: 32%;
+  top: 12%;
+  width: 24%;
+  height: 38%;
+}
+
+/* When doubles is active, pull primary slots slightly outward */
+.battle-arena.doubles .sprite-slot.player-0 {
+  left: 2%;
+  bottom: 10%;
+  width: 30%;
+}
+
+.battle-arena.doubles .sprite-slot.opponent-0 {
+  right: 4%;
+  top: 14%;
+  width: 24%;
+}
+
+/* ── Sprite image ────────────────────────────────────────────────────────── */
+
+.pokemon-sprite {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: pixelated;
+  image-rendering: -webkit-crisp-edges;
+  filter: drop-shadow(2px 4px 0 rgba(0, 0, 0, 0.35));
+  /* Scale up small sprites */
+  width: auto;
+  height: auto;
+  min-width: 64px;
+  min-height: 64px;
+  object-fit: contain;
+}
+
+/* Player sprites are usually back sprites (larger) */
+.sprite-slot[class*="player"] .pokemon-sprite {
+  transform: scale(2.5);
+  transform-origin: bottom center;
+}
+
+/* Opponent sprites are front sprites (slightly smaller) */
+.sprite-slot[class*="opponent"] .pokemon-sprite {
+  transform: scale(2);
+  transform-origin: bottom center;
+}
+
+/* Fainted sprite dim */
+.sprite-slot.fainted .pokemon-sprite {
+  opacity: 0.25;
+  filter: grayscale(1) drop-shadow(2px 4px 0 rgba(0, 0, 0, 0.35));
+}
+
+/* ── Ground shadow beneath sprites ──────────────────────────────────────── */
+
+.sprite-slot::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 10px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  z-index: -1;
+}
+
+/* ── Bottom panel ────────────────────────────────────────────────────────── */
+
+.battle-bottom {
+  flex: 0 0 30%;
+  display: flex;
+  border-top: 2px solid var(--panel-border);
+  background: var(--panel-bg);
+  min-height: 0;
+}
+
+/* ==========================================================================
+   Battle Backgrounds — CSS gradient-based, GBA-era flavor
+   Each has a sky/ceiling (upper 65%) and ground plane (lower 35%).
+   ========================================================================== */
+
+/* ── Grassland ───────────────────────────────────────────────────────────── */
+
+.bg-grassland {
+  background:
+    /* ground */
+    linear-gradient(
+      to bottom,
+      #5a9e3e 0%,
+      #4a8a34 40%,
+      #3d7a2c 100%
+    ) bottom / 100% 35% no-repeat,
+    /* sky */
+    linear-gradient(
+      to bottom,
+      #88ccee 0%,
+      #aaddff 50%,
+      #cceeff 100%
+    ) top / 100% 65% no-repeat;
+}
+
+/* Horizon line for grassland */
+.bg-grassland::before {
+  content: '';
+  position: absolute;
+  top: 65%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+
+/* ── Cave ────────────────────────────────────────────────────────────────── */
+
+.bg-cave {
+  background:
+    /* ground */
+    linear-gradient(
+      to bottom,
+      #4a4a52 0%,
+      #3a3a42 50%,
+      #2a2a32 100%
+    ) bottom / 100% 35% no-repeat,
+    /* ceiling */
+    linear-gradient(
+      to bottom,
+      #1a1a22 0%,
+      #2a2a38 40%,
+      #3a3a48 100%
+    ) top / 100% 65% no-repeat;
+}
+
+.bg-cave::before {
+  content: '';
+  position: absolute;
+  top: 65%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 1;
+}
+
+/* ── Ocean ────────────────────────────────────────────────────────────────── */
+
+.bg-ocean {
+  background:
+    /* water */
+    linear-gradient(
+      to bottom,
+      #3070b8 0%,
+      #2860a8 40%,
+      #205098 100%
+    ) bottom / 100% 35% no-repeat,
+    /* sky */
+    linear-gradient(
+      to bottom,
+      #6ab0e8 0%,
+      #88c8f0 50%,
+      #a8d8f8 100%
+    ) top / 100% 65% no-repeat;
+}
+
+.bg-ocean::before {
+  content: '';
+  position: absolute;
+  top: 65%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.2));
+  z-index: 1;
+}
+
+/* ── Mountain ────────────────────────────────────────────────────────────── */
+
+.bg-mountain {
+  background:
+    /* rocky ground */
+    linear-gradient(
+      to bottom,
+      #8a7a68 0%,
+      #7a6a58 40%,
+      #6a5a48 100%
+    ) bottom / 100% 35% no-repeat,
+    /* sky */
+    linear-gradient(
+      to bottom,
+      #a0b8d0 0%,
+      #b8c8d8 50%,
+      #c8d4e0 100%
+    ) top / 100% 65% no-repeat;
+}
+
+.bg-mountain::before {
+  content: '';
+  position: absolute;
+  top: 65%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+/* ── Forest ──────────────────────────────────────────────────────────────── */
+
+.bg-forest {
+  background:
+    /* dark forest floor */
+    linear-gradient(
+      to bottom,
+      #2e5a28 0%,
+      #264e22 40%,
+      #1e421c 100%
+    ) bottom / 100% 35% no-repeat,
+    /* canopy / filtered light */
+    linear-gradient(
+      to bottom,
+      #1a3a18 0%,
+      #2a5a26 40%,
+      #3a6a34 100%
+    ) top / 100% 65% no-repeat;
+}
+
+.bg-forest::before {
+  content: '';
+  position: absolute;
+  top: 65%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
+
+/* ==========================================================================
+   Weather overlay effects (applied on .battle-arena)
+   ========================================================================== */
+
+.weather-rain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    100deg,
+    transparent,
+    transparent 4px,
+    rgba(120, 160, 220, 0.12) 4px,
+    rgba(120, 160, 220, 0.12) 5px
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+.weather-sun::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 80% 10%,
+    rgba(255, 220, 100, 0.2) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+.weather-sandstorm::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(180, 160, 100, 0.12) 30%,
+    rgba(180, 160, 100, 0.08) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+.weather-hail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(200, 220, 255, 0.1) 0%,
+    rgba(200, 220, 255, 0.05) 100%
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ==========================================================================
+   Sprite entrance / faint animations
+   ========================================================================== */
+
+@keyframes sprite-enter {
+  from {
+    opacity: 0;
+    transform: scale(0) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes sprite-faint {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+@keyframes sprite-hit {
+  0%, 100% { filter: brightness(1) drop-shadow(2px 4px 0 rgba(0,0,0,0.35)); }
+  50%      { filter: brightness(2) drop-shadow(2px 4px 0 rgba(0,0,0,0.35)); }
+}
+
+.sprite-entering .pokemon-sprite {
+  animation: sprite-enter 0.4s ease-out forwards;
+}
+
+.sprite-fainting .pokemon-sprite {
+  animation: sprite-faint 0.6s ease-in forwards;
+}
+
+.sprite-hit .pokemon-sprite {
+  animation: sprite-hit 0.15s linear 3;
+}

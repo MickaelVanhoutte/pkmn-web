@@ -1,8 +1,10 @@
 import type { BattleEngine } from '@/engine/battle-engine';
 import type { TurnAction } from '@/types/battle';
-import type { PlayerIndex, TypeName } from '@/types/common';
+import type { PlayerIndex, TypeName, BattlePosition } from '@/types/common';
+import type { MoveTarget } from '@/types/move';
 import { getTypeEffectiveness } from '@/data/type-chart';
 import { getMove } from '@/data/move-registry';
+import { needsTargetSelection } from '@/engine/action-validator';
 
 /**
  * Simple AI that picks the best available action for each active slot.
@@ -26,12 +28,14 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
   for (const slotInfo of availableActions) {
     const { slot, canMove, canSwitch } = slotInfo;
 
-    // Gather opponent active pokemon types
+    // Gather opponent active pokemon types and their slot indices
     const opponentTypes: TypeName[][] = [];
+    const opponentSlots: number[] = [];
     for (let s = 0; s < slotsPerSide; s++) {
       const oppMon = engine.getActivePokemon(opponentIndex, s);
       if (oppMon && !oppMon.isFainted) {
         opponentTypes.push(oppMon.species.types as TypeName[]);
+        opponentSlots.push(s);
       }
     }
 
@@ -39,13 +43,15 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
     const aiMon = engine.getActivePokemon(player, slot);
     const aiTypes: TypeName[] = aiMon ? (aiMon.species.types as TypeName[]) : [];
 
-    // Score each available move
+    // Score each available move, tracking best target per move
     let bestMoveIndex = -1;
     let bestScore = -1;
+    let bestTarget: BattlePosition | undefined;
 
     for (const move of canMove) {
       const moveData = getMove(move.moveId);
       const basePower = moveData.power ?? 0;
+      const moveTarget = move.moveTarget as MoveTarget;
 
       if (basePower === 0) {
         // Status move: assign a small score so it can be a fallback
@@ -53,13 +59,17 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
         if (statusScore > bestScore) {
           bestScore = statusScore;
           bestMoveIndex = move.moveIndex;
+          bestTarget = undefined;
         }
         continue;
       }
 
-      // Calculate effectiveness against each opponent and take the best
+      // Calculate effectiveness against each opponent and pick the best target
       let moveScore = 0;
-      for (const defTypes of opponentTypes) {
+      let moveTarget_: BattlePosition | undefined;
+
+      for (let oi = 0; oi < opponentTypes.length; oi++) {
+        const defTypes = opponentTypes[oi];
         const effectiveness = getTypeEffectiveness(moveData.type, defTypes);
         let score = basePower * effectiveness;
 
@@ -70,6 +80,10 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
 
         if (score > moveScore) {
           moveScore = score;
+          // Track which opponent slot scored highest for single-target moves
+          if (needsTargetSelection(moveTarget, format)) {
+            moveTarget_ = { player: opponentIndex, slot: opponentSlots[oi] };
+          }
         }
       }
 
@@ -81,6 +95,7 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
       if (moveScore > bestScore) {
         bestScore = moveScore;
         bestMoveIndex = move.moveIndex;
+        bestTarget = moveTarget_;
       }
     }
 
@@ -93,15 +108,8 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
         moveIndex: bestMoveIndex,
       };
 
-      // In doubles, set target to first active opponent slot
-      if (format === 'doubles') {
-        for (let s = 0; s < slotsPerSide; s++) {
-          const oppMon = engine.getActivePokemon(opponentIndex, s);
-          if (oppMon && !oppMon.isFainted) {
-            action.targetPosition = { player: opponentIndex, slot: s };
-            break;
-          }
-        }
+      if (bestTarget) {
+        action.targetPosition = bestTarget;
       }
 
       actions.push(action);
@@ -148,20 +156,18 @@ export function chooseAIActions(engine: BattleEngine, player: PlayerIndex): Turn
 
     // Absolute fallback: use first available move (e.g. Struggle scenario)
     if (canMove.length > 0) {
+      const fallbackMove = canMove[0];
       const action: TurnAction = {
         type: 'move',
         player,
         slot,
-        moveIndex: canMove[0].moveIndex,
+        moveIndex: fallbackMove.moveIndex,
       };
 
-      if (format === 'doubles') {
-        for (let s = 0; s < slotsPerSide; s++) {
-          const oppMon = engine.getActivePokemon(opponentIndex, s);
-          if (oppMon && !oppMon.isFainted) {
-            action.targetPosition = { player: opponentIndex, slot: s };
-            break;
-          }
+      if (format === 'doubles' && needsTargetSelection(fallbackMove.moveTarget as MoveTarget, format)) {
+        // Target first active opponent
+        if (opponentSlots.length > 0) {
+          action.targetPosition = { player: opponentIndex, slot: opponentSlots[0] };
         }
       }
 

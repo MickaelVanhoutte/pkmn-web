@@ -7,6 +7,7 @@ import { createBattleLog, type BattleLogComponent } from '../components/battle-l
 import { createActionMenu, type ActionMenuComponent } from '../components/action-menu';
 import { createMovePanel, type MovePanelComponent } from '../components/move-panel';
 import { createSwitchPanel, type SwitchPanelComponent } from '../components/switch-panel';
+import { createTargetPanel, type TargetPanelComponent } from '../components/target-panel';
 import { BattleController, type BattleUI } from '../battle/battle-controller';
 import { CanvasOverlay } from '../animation/canvas-overlay';
 import { PositionResolver } from '../animation/position-resolver';
@@ -56,6 +57,7 @@ export function showBattleScreen(
   const actionMenu: ActionMenuComponent = createActionMenu();
   const movePanel: MovePanelComponent = createMovePanel();
   const switchPanel: SwitchPanelComponent = createSwitchPanel();
+  const targetPanel: TargetPanelComponent = createTargetPanel();
 
   // Top bar: turn counter (left) + location name (right)
   const turnCounter = el('span', { class: 'turn-counter' }, ['Turn 1']);
@@ -81,6 +83,7 @@ export function showBattleScreen(
     actionMenu.el,
     movePanel.el,
     switchPanel.el,
+    targetPanel.el,
   ]);
 
   const battleContainer = el('div', { class: 'battle-container' }, [arena, bottomPanel]);
@@ -115,6 +118,7 @@ export function showBattleScreen(
     actionMenu,
     movePanel,
     switchPanel,
+    targetPanel,
     turnCounter,
     onBattleEnd: (winner: PlayerIndex | null) => {
       setTimeout(() => {

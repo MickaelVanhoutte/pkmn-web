@@ -582,10 +582,9 @@
   flex: 1 1 45%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   padding: 8px;
-  gap: 6px;
+  gap: 3px;
+  overflow-y: auto;
   min-width: 0;
 }
 
@@ -594,14 +593,13 @@
   color: var(--text-secondary);
   text-shadow: var(--text-shadow);
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.target-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  width: 100%;
+.target-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 /* Label row for opponent / ally sides */
@@ -610,35 +608,8 @@
   color: var(--text-secondary);
   text-shadow: var(--text-shadow);
   text-transform: uppercase;
-  grid-column: 1 / -1;
   text-align: center;
-}
-
-.target-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 4px;
-  font-size: 7px;
-  text-shadow: var(--text-shadow);
-  gap: 2px;
-}
-
-.target-btn:hover:not(:disabled) {
-  background: var(--btn-hover);
-  transform: scale(1.03);
-}
-
-.target-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
-.target-btn-back {
-  font-size: 7px;
-  padding: 4px 8px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* ==========================================================================

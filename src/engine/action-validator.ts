@@ -1,7 +1,14 @@
 import type { TurnAction, PlayerIndex } from '../types';
 import type { BattleState, PlayerState } from '../types/battle';
+import type { MoveTarget } from '../types/move';
 import { getItem } from '../data/item-registry';
 import { getMove } from '../data/move-registry';
+
+/** Returns true if this move target type requires the player to pick a specific target in the given format. */
+export function needsTargetSelection(target: MoveTarget, format: string): boolean {
+  if (format === 'singles') return false;
+  return target === 'adjacent-foe' || target === 'adjacent-ally';
+}
 
 export interface ValidationResult {
   valid: boolean;
@@ -78,6 +85,28 @@ export function validateActions(
           const chargedIdx = pokemon.moves.findIndex(m => m.moveId === pokemon.chargeMoveId);
           if (chargedIdx >= 0 && action.moveIndex !== chargedIdx) {
             errors.push(`Must use charged move ${pokemon.chargeMoveId}`);
+          }
+        }
+        // Target validation in doubles
+        if (state.config.format === 'doubles' && action.targetPosition) {
+          const moveData = getMove(move.moveId);
+          if (needsTargetSelection(moveData.target, state.config.format)) {
+            const tp = action.targetPosition;
+            const targetSide = state.players[tp.player];
+            if (targetSide) {
+              const tIdx = targetSide.activePokemon[tp.slot];
+              const tPoke = tIdx !== undefined ? targetSide.team[tIdx] : null;
+              if (!tPoke || tPoke.isFainted) {
+                errors.push(`Target at player ${tp.player} slot ${tp.slot} is not a valid active pokemon`);
+              }
+              // adjacent-foe must target opponent, adjacent-ally must target ally
+              if (moveData.target === 'adjacent-foe' && tp.player === player) {
+                errors.push(`adjacent-foe move cannot target own side`);
+              }
+              if (moveData.target === 'adjacent-ally' && tp.player !== player) {
+                errors.push(`adjacent-ally move cannot target opponent`);
+              }
+            }
           }
         }
         break;

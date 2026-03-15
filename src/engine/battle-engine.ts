@@ -513,7 +513,7 @@ export class BattleEngine {
    */
   getAvailableActions(player: PlayerIndex): {
     slot: number;
-    canMove: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[];
+    canMove: { moveIndex: number; moveId: string; moveName: string; moveType: string; moveTarget: string; pp: number; maxPp: number }[];
     canSwitch: { teamIndex: number; pokemonName: string; speciesId: string; currentHp: number; maxHp: number }[];
   }[] {
     const playerState = this.state.players[player];
@@ -525,7 +525,7 @@ export class BattleEngine {
       if (!pokemon || pokemon.isFainted) continue;
 
       // Available moves
-      const canMove: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[] = [];
+      const canMove: { moveIndex: number; moveId: string; moveName: string; moveType: string; moveTarget: string; pp: number; maxPp: number }[] = [];
       for (let mi = 0; mi < pokemon.moves.length; mi++) {
         const ms = pokemon.moves[mi];
         if (ms.currentPp <= 0) continue;
@@ -541,6 +541,7 @@ export class BattleEngine {
           moveId: ms.moveId,
           moveName: moveData.name,
           moveType: moveData.type,
+          moveTarget: moveData.target,
           pp: ms.currentPp,
           maxPp: ms.maxPp,
         });

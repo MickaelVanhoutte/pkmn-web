@@ -1,14 +1,17 @@
 import { BattleEngine } from '@/engine/battle-engine';
 import type { BattleConfig, TurnAction, PlayerState } from '@/types/battle';
 import type { BattleEvent } from '@/types/events';
-import type { PlayerIndex, MajorStatus } from '@/types/common';
+import type { PlayerIndex, BattlePosition, MajorStatus } from '@/types/common';
+import type { MoveTarget } from '@/types/move';
 import type { PokemonBattleState } from '@/types/pokemon';
+import { needsTargetSelection, getValidMoveTargets } from '@/engine/action-validator';
 import { renderEvent, type EventUIUpdate } from './event-renderer';
 import { chooseAIActions } from '../ai/simple-ai';
 import { audioManager } from '../util/audio';
 import type { MoveAnimationPlayer } from '../animation/move-animation-player';
 import type { SpriteAnimator } from '../animation/sprite-animator';
 import { getMoveAnimation, getChargeAnimation } from '../animation/defs';
+import type { TargetOption } from '../components/target-panel';
 
 // The UI components this controller needs to interact with
 export interface BattleUI {
@@ -24,6 +27,7 @@ export interface BattleUI {
   actionMenu: { show(): void; hide(): void; onFight: (() => void) | null; onPokemon: (() => void) | null; onBag: (() => void) | null; onRun: (() => void) | null };
   movePanel: { show(moves: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[]): void; hide(): void; onMoveSelect: ((idx: number) => void) | null; onBack: (() => void) | null };
   switchPanel: { show(pokemon: { teamIndex: number; pokemonName: string; speciesId: string; currentHp: number; maxHp: number; isActive?: boolean; isFainted?: boolean }[]): void; hide(): void; onSwitch: ((idx: number) => void) | null; onBack: (() => void) | null };
+  targetPanel: { show(targets: TargetOption[]): void; hide(): void; onTargetSelect: ((position: BattlePosition) => void) | null; onBack: (() => void) | null };
   turnCounter: HTMLElement;
   onBattleEnd: ((winner: PlayerIndex | null) => void) | null;
 }
@@ -136,29 +140,18 @@ export class BattleController {
 
         this.ui.movePanel.onMoveSelect = (moveIndex: number) => {
           this.ui.movePanel.hide();
-          this.cleanupCallbacks();
 
-          const action: TurnAction = {
-            type: 'move',
-            player: 0,
-            slot,
-            moveIndex,
-          };
-
-          // In doubles, handle target selection
           const format = this.engine.getState().config.format;
-          if (format === 'doubles') {
-            // For simplicity, default to targeting the first active opponent
-            for (let s = 0; s < 2; s++) {
-              const oppMon = this.engine.getActivePokemon(1, s);
-              if (oppMon && !oppMon.isFainted) {
-                action.targetPosition = { player: 1, slot: s };
-                break;
-              }
-            }
-          }
+          const selectedMove = slotInfo.canMove.find(m => m.moveIndex === moveIndex);
+          const moveTarget = selectedMove?.moveTarget as MoveTarget | undefined;
 
-          resolve(action);
+          // Check if this move needs manual target selection
+          if (moveTarget && needsTargetSelection(moveTarget, format)) {
+            this.showTargetSelection(slot, moveIndex, moveTarget, resolve);
+          } else {
+            this.cleanupCallbacks();
+            resolve({ type: 'move', player: 0, slot, moveIndex });
+          }
         };
 
         this.ui.movePanel.onBack = () => {
@@ -491,6 +484,7 @@ export class BattleController {
     this.ui.actionMenu.hide();
     this.ui.movePanel.hide();
     this.ui.switchPanel.hide();
+    this.ui.targetPanel.hide();
   }
 
   private cleanupCallbacks(): void {
@@ -502,6 +496,8 @@ export class BattleController {
     this.ui.movePanel.onBack = null;
     this.ui.switchPanel.onSwitch = null;
     this.ui.switchPanel.onBack = null;
+    this.ui.targetPanel.onTargetSelect = null;
+    this.ui.targetPanel.onBack = null;
   }
 
   private showSwitchPanel(forceSwitch: boolean): void {
@@ -516,6 +512,57 @@ export class BattleController {
       isFainted: mon.isFainted,
     }));
     this.ui.switchPanel.show(switchOptions);
+  }
+
+  private showTargetSelection(
+    slot: number,
+    moveIndex: number,
+    moveTarget: MoveTarget,
+    resolve: (action: TurnAction) => void,
+  ): void {
+    const state = this.engine.getState();
+    const playerState = state.players[0];
+    const opponentState = state.players[1];
+    const validTargets = getValidMoveTargets(slot, moveIndex, playerState, opponentState, state.config.format);
+
+    const targetOptions: TargetOption[] = validTargets.map(t => {
+      const side = state.players[t.player];
+      const idx = side.activePokemon[t.slot];
+      const mon = side.team[idx];
+      return {
+        position: { player: t.player, slot: t.slot },
+        pokemonName: mon.config.nickname ?? mon.species.name,
+        speciesId: mon.species.id,
+        currentHp: mon.currentHp,
+        maxHp: mon.maxHp,
+        isAlly: t.player === 0,
+      };
+    });
+
+    // If only one valid target, auto-select it
+    if (targetOptions.length <= 1) {
+      this.cleanupCallbacks();
+      const action: TurnAction = { type: 'move', player: 0, slot, moveIndex };
+      if (targetOptions.length === 1) {
+        action.targetPosition = targetOptions[0].position;
+      }
+      resolve(action);
+      return;
+    }
+
+    this.ui.targetPanel.show(targetOptions);
+
+    this.ui.targetPanel.onTargetSelect = (position: BattlePosition) => {
+      this.ui.targetPanel.hide();
+      this.cleanupCallbacks();
+      resolve({ type: 'move', player: 0, slot, moveIndex, targetPosition: position });
+    };
+
+    this.ui.targetPanel.onBack = () => {
+      this.ui.targetPanel.hide();
+      // Go back to move selection
+      this.waitForPlayerAction(slot).then(resolve);
+    };
   }
 
   // ---- Public accessors for the engine (useful for external code) ----

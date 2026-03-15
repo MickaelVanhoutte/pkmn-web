@@ -1,0 +1,514 @@
+[
+  {
+    "id": "snorlax",
+    "name": "Snorlax",
+    "types": [
+      "normal"
+    ],
+    "baseStats": {
+      "hp": 160,
+      "atk": 110,
+      "def": 65,
+      "spa": 65,
+      "spd": 110,
+      "spe": 30
+    },
+    "possibleAbilities": [
+      "sturdy",
+      "inner-focus"
+    ],
+    "learnableMoves": [
+      "tackle",
+      "double-edge",
+      "earthquake",
+      "recover",
+      "protect",
+      "substitute",
+      "whirlwind"
+    ]
+  },
+  {
+    "id": "charizard",
+    "name": "Charizard",
+    "types": [
+      "fire",
+      "flying"
+    ],
+    "baseStats": {
+      "hp": 78,
+      "atk": 84,
+      "def": 78,
+      "spa": 109,
+      "spd": 85,
+      "spe": 100
+    },
+    "possibleAbilities": [
+      "blaze"
+    ],
+    "learnableMoves": [
+      "flamethrower",
+      "air-slash",
+      "dragon-pulse",
+      "sunny-day",
+      "will-o-wisp",
+      "protect",
+      "fly",
+      "solar-beam",
+      "substitute"
+    ]
+  },
+  {
+    "id": "blastoise",
+    "name": "Blastoise",
+    "types": [
+      "water"
+    ],
+    "baseStats": {
+      "hp": 79,
+      "atk": 83,
+      "def": 100,
+      "spa": 85,
+      "spd": 105,
+      "spe": 78
+    },
+    "possibleAbilities": [
+      "torrent"
+    ],
+    "learnableMoves": [
+      "surf",
+      "ice-beam",
+      "rapid-spin",
+      "rain-dance",
+      "protect",
+      "substitute"
+    ]
+  },
+  {
+    "id": "jolteon",
+    "name": "Jolteon",
+    "types": [
+      "electric"
+    ],
+    "baseStats": {
+      "hp": 65,
+      "atk": 65,
+      "def": 60,
+      "spa": 110,
+      "spd": 95,
+      "spe": 130
+    },
+    "possibleAbilities": [
+      "static"
+    ],
+    "learnableMoves": [
+      "thunderbolt",
+      "shadow-ball",
+      "thunder-wave",
+      "protect",
+      "quick-attack",
+      "substitute"
+    ]
+  },
+  {
+    "id": "venusaur",
+    "name": "Venusaur",
+    "types": [
+      "grass",
+      "poison"
+    ],
+    "baseStats": {
+      "hp": 80,
+      "atk": 82,
+      "def": 83,
+      "spa": 100,
+      "spd": 100,
+      "spe": 80
+    },
+    "possibleAbilities": [
+      "overgrow",
+      "chlorophyll"
+    ],
+    "learnableMoves": [
+      "energy-ball",
+      "sludge-bomb",
+      "giga-drain",
+      "sunny-day",
+      "protect",
+      "solar-beam",
+      "grassy-terrain",
+      "substitute"
+    ]
+  },
+  {
+    "id": "lapras",
+    "name": "Lapras",
+    "types": [
+      "water",
+      "ice"
+    ],
+    "baseStats": {
+      "hp": 130,
+      "atk": 85,
+      "def": 80,
+      "spa": 85,
+      "spd": 95,
+      "spe": 60
+    },
+    "possibleAbilities": [
+      "water-absorb"
+    ],
+    "learnableMoves": [
+      "surf",
+      "ice-beam",
+      "thunderbolt",
+      "rain-dance",
+      "protect",
+      "icicle-spear",
+      "substitute",
+      "confuse-ray"
+    ]
+  },
+  {
+    "id": "lucario",
+    "name": "Lucario",
+    "types": [
+      "fighting",
+      "steel"
+    ],
+    "baseStats": {
+      "hp": 70,
+      "atk": 110,
+      "def": 70,
+      "spa": 115,
+      "spd": 70,
+      "spe": 90
+    },
+    "possibleAbilities": [
+      "inner-focus"
+    ],
+    "learnableMoves": [
+      "close-combat",
+      "iron-head",
+      "dark-pulse",
+      "swords-dance",
+      "quick-attack",
+      "protect",
+      "bullet-seed",
+      "substitute"
+    ]
+  },
+  {
+    "id": "gengar",
+    "name": "Gengar",
+    "types": [
+      "ghost",
+      "poison"
+    ],
+    "baseStats": {
+      "hp": 60,
+      "atk": 65,
+      "def": 60,
+      "spa": 130,
+      "spd": 75,
+      "spe": 110
+    },
+    "possibleAbilities": [
+      "levitate"
+    ],
+    "learnableMoves": [
+      "shadow-ball",
+      "sludge-bomb",
+      "thunderbolt",
+      "will-o-wisp",
+      "protect",
+      "confuse-ray",
+      "substitute"
+    ]
+  },
+  {
+    "id": "garchomp",
+    "name": "Garchomp",
+    "types": [
+      "dragon",
+      "ground"
+    ],
+    "baseStats": {
+      "hp": 108,
+      "atk": 130,
+      "def": 95,
+      "spa": 80,
+      "spd": 85,
+      "spe": 102
+    },
+    "possibleAbilities": [
+      "sand-stream"
+    ],
+    "learnableMoves": [
+      "earthquake",
+      "dragon-pulse",
+      "rock-slide",
+      "swords-dance",
+      "protect",
+      "substitute"
+    ]
+  },
+  {
+    "id": "togekiss",
+    "name": "Togekiss",
+    "types": [
+      "fairy",
+      "flying"
+    ],
+    "baseStats": {
+      "hp": 85,
+      "atk": 50,
+      "def": 95,
+      "spa": 120,
+      "spd": 115,
+      "spe": 80
+    },
+    "possibleAbilities": [
+      "serene-grace"
+    ],
+    "learnableMoves": [
+      "moonblast",
+      "air-slash",
+      "thunder-wave",
+      "recover",
+      "protect",
+      "substitute",
+      "misty-terrain"
+    ]
+  },
+  {
+    "id": "alakazam",
+    "name": "Alakazam",
+    "types": [
+      "psychic"
+    ],
+    "baseStats": {
+      "hp": 55,
+      "atk": 50,
+      "def": 45,
+      "spa": 135,
+      "spd": 95,
+      "spe": 120
+    },
+    "possibleAbilities": [
+      "inner-focus"
+    ],
+    "learnableMoves": [
+      "psychic",
+      "shadow-ball",
+      "energy-ball",
+      "thunder-wave",
+      "recover",
+      "protect",
+      "light-screen",
+      "reflect",
+      "substitute",
+      "psychic-terrain",
+      "confuse-ray"
+    ]
+  },
+  {
+    "id": "scizor",
+    "name": "Scizor",
+    "types": [
+      "bug",
+      "steel"
+    ],
+    "baseStats": {
+      "hp": 70,
+      "atk": 130,
+      "def": 100,
+      "spa": 55,
+      "spd": 80,
+      "spe": 65
+    },
+    "possibleAbilities": [
+      "technician"
+    ],
+    "learnableMoves": [
+      "x-scissor",
+      "iron-head",
+      "quick-attack",
+      "swords-dance",
+      "protect",
+      "bullet-seed",
+      "dual-wingbeat",
+      "pursuit",
+      "substitute"
+    ]
+  },
+  {
+    "id": "tyranitar",
+    "name": "Tyranitar",
+    "types": [
+      "rock",
+      "dark"
+    ],
+    "baseStats": {
+      "hp": 100,
+      "atk": 134,
+      "def": 110,
+      "spa": 95,
+      "spd": 100,
+      "spe": 61
+    },
+    "possibleAbilities": [
+      "sand-stream"
+    ],
+    "learnableMoves": [
+      "rock-slide",
+      "dark-pulse",
+      "earthquake",
+      "stealth-rock",
+      "protect",
+      "pursuit",
+      "substitute",
+      "rock-blast"
+    ]
+  },
+  {
+    "id": "dragonite",
+    "name": "Dragonite",
+    "types": [
+      "dragon",
+      "flying"
+    ],
+    "baseStats": {
+      "hp": 91,
+      "atk": 134,
+      "def": 95,
+      "spa": 100,
+      "spd": 100,
+      "spe": 80
+    },
+    "possibleAbilities": [
+      "multiscale",
+      "inner-focus"
+    ],
+    "learnableMoves": [
+      "dragon-pulse",
+      "air-slash",
+      "earthquake",
+      "ice-beam",
+      "protect",
+      "fly",
+      "roar",
+      "substitute"
+    ]
+  },
+  {
+    "id": "swampert",
+    "name": "Swampert",
+    "types": [
+      "water",
+      "ground"
+    ],
+    "baseStats": {
+      "hp": 100,
+      "atk": 110,
+      "def": 90,
+      "spa": 85,
+      "spd": 90,
+      "spe": 60
+    },
+    "possibleAbilities": [
+      "torrent",
+      "swift-swim"
+    ],
+    "learnableMoves": [
+      "surf",
+      "earthquake",
+      "ice-beam",
+      "stealth-rock",
+      "protect",
+      "roar",
+      "substitute"
+    ]
+  },
+  {
+    "id": "ferrothorn",
+    "name": "Ferrothorn",
+    "types": [
+      "grass",
+      "steel"
+    ],
+    "baseStats": {
+      "hp": 74,
+      "atk": 94,
+      "def": 131,
+      "spa": 54,
+      "spd": 116,
+      "spe": 20
+    },
+    "possibleAbilities": [
+      "iron-fist"
+    ],
+    "learnableMoves": [
+      "energy-ball",
+      "iron-head",
+      "spikes",
+      "stealth-rock",
+      "protect",
+      "substitute"
+    ]
+  },
+  {
+    "id": "azumarill",
+    "name": "Azumarill",
+    "types": [
+      "water",
+      "fairy"
+    ],
+    "baseStats": {
+      "hp": 100,
+      "atk": 50,
+      "def": 80,
+      "spa": 60,
+      "spd": 80,
+      "spe": 50
+    },
+    "possibleAbilities": [
+      "huge-power"
+    ],
+    "learnableMoves": [
+      "surf",
+      "moonblast",
+      "ice-beam",
+      "protect",
+      "substitute"
+    ]
+  },
+  {
+    "id": "metagross",
+    "name": "Metagross",
+    "types": [
+      "steel",
+      "psychic"
+    ],
+    "baseStats": {
+      "hp": 80,
+      "atk": 135,
+      "def": 130,
+      "spa": 95,
+      "spd": 90,
+      "spe": 70
+    },
+    "possibleAbilities": [
+      "clear-body"
+    ],
+    "learnableMoves": [
+      "iron-head",
+      "psychic",
+      "earthquake",
+      "rock-slide",
+      "protect",
+      "rock-blast",
+      "substitute",
+      "electric-terrain"
+    ]
+  }
+]

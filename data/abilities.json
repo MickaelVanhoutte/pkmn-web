@@ -1,0 +1,122 @@
+[
+  {
+    "id": "blaze",
+    "name": "Blaze",
+    "description": "Powers up Fire-type moves when HP is below 1/3.",
+    "triggers": ["modifyDamage"]
+  },
+  {
+    "id": "torrent",
+    "name": "Torrent",
+    "description": "Powers up Water-type moves when HP is below 1/3.",
+    "triggers": ["modifyDamage"]
+  },
+  {
+    "id": "overgrow",
+    "name": "Overgrow",
+    "description": "Powers up Grass-type moves when HP is below 1/3.",
+    "triggers": ["modifyDamage"]
+  },
+  {
+    "id": "static",
+    "name": "Static",
+    "description": "Contact with the Pokemon may cause paralysis.",
+    "triggers": ["onBeingHit"]
+  },
+  {
+    "id": "intimidate",
+    "name": "Intimidate",
+    "description": "Lowers the opposing Pokemon's Attack stat on switch-in.",
+    "triggers": ["onSwitchIn"]
+  },
+  {
+    "id": "levitate",
+    "name": "Levitate",
+    "description": "Gives immunity to Ground-type moves.",
+    "triggers": ["onTryHit"]
+  },
+  {
+    "id": "chlorophyll",
+    "name": "Chlorophyll",
+    "description": "Boosts the Pokemon's Speed stat in harsh sunlight.",
+    "triggers": ["modifySpe"]
+  },
+  {
+    "id": "swift-swim",
+    "name": "Swift Swim",
+    "description": "Boosts the Pokemon's Speed stat in rain.",
+    "triggers": ["modifySpe"]
+  },
+  {
+    "id": "clear-body",
+    "name": "Clear Body",
+    "description": "Prevents other Pokemon from lowering its stats.",
+    "triggers": ["onStatChange"]
+  },
+  {
+    "id": "huge-power",
+    "name": "Huge Power",
+    "description": "Doubles the Pokemon's Attack stat.",
+    "triggers": ["modifyAtk"]
+  },
+  {
+    "id": "water-absorb",
+    "name": "Water Absorb",
+    "description": "Restores HP if hit by a Water-type move.",
+    "triggers": ["onTryHit"]
+  },
+  {
+    "id": "sand-stream",
+    "name": "Sand Stream",
+    "description": "Summons a sandstorm on switch-in.",
+    "triggers": ["onSwitchIn"]
+  },
+  {
+    "id": "natural-cure",
+    "name": "Natural Cure",
+    "description": "Heals status conditions on switch-out.",
+    "triggers": ["onSwitchOut"]
+  },
+  {
+    "id": "serene-grace",
+    "name": "Serene Grace",
+    "description": "Doubles the chance of secondary effects.",
+    "triggers": ["modifyDamage"]
+  },
+  {
+    "id": "technician",
+    "name": "Technician",
+    "description": "Powers up weaker moves (60 base power or less).",
+    "triggers": ["modifyDamage"]
+  },
+  {
+    "id": "iron-fist",
+    "name": "Iron Fist",
+    "description": "Powers up punching moves.",
+    "triggers": ["modifyDamage"]
+  },
+  {
+    "id": "inner-focus",
+    "name": "Inner Focus",
+    "description": "Prevents flinching.",
+    "triggers": ["onBeingHit"]
+  },
+  {
+    "id": "sturdy",
+    "name": "Sturdy",
+    "description": "Survives a hit that would KO from full HP with 1 HP.",
+    "triggers": ["onDamageReceived"]
+  },
+  {
+    "id": "pressure",
+    "name": "Pressure",
+    "description": "Raises opposing Pokemon's PP usage.",
+    "triggers": ["onSwitchIn"]
+  },
+  {
+    "id": "multiscale",
+    "name": "Multiscale",
+    "description": "Halves damage taken when at full HP.",
+    "triggers": ["modifyDamage"]
+  }
+]

@@ -1,0 +1,100 @@
+[
+  {
+    "id": "potion",
+    "name": "Potion",
+    "description": "Restores 20 HP.",
+    "category": "healing",
+    "effect": { "type": "heal-hp", "value": 20 }
+  },
+  {
+    "id": "super-potion",
+    "name": "Super Potion",
+    "description": "Restores 60 HP.",
+    "category": "healing",
+    "effect": { "type": "heal-hp", "value": 60 }
+  },
+  {
+    "id": "full-restore",
+    "name": "Full Restore",
+    "description": "Fully restores HP and cures status.",
+    "category": "healing",
+    "effect": { "type": "heal-hp", "value": 9999 }
+  },
+  {
+    "id": "antidote",
+    "name": "Antidote",
+    "description": "Cures poison.",
+    "category": "status-cure",
+    "effect": { "type": "cure-status", "status": "poison" }
+  },
+  {
+    "id": "burn-heal",
+    "name": "Burn Heal",
+    "description": "Cures burn.",
+    "category": "status-cure",
+    "effect": { "type": "cure-status", "status": "burn" }
+  },
+  {
+    "id": "paralyze-heal",
+    "name": "Paralyze Heal",
+    "description": "Cures paralysis.",
+    "category": "status-cure",
+    "effect": { "type": "cure-status", "status": "paralysis" }
+  },
+  {
+    "id": "ice-heal",
+    "name": "Ice Heal",
+    "description": "Cures freeze.",
+    "category": "status-cure",
+    "effect": { "type": "cure-status", "status": "freeze" }
+  },
+  {
+    "id": "awakening",
+    "name": "Awakening",
+    "description": "Cures sleep.",
+    "category": "status-cure",
+    "effect": { "type": "cure-status", "status": "sleep" }
+  },
+  {
+    "id": "full-heal",
+    "name": "Full Heal",
+    "description": "Cures any status condition.",
+    "category": "status-cure",
+    "effect": { "type": "cure-status" }
+  },
+  {
+    "id": "leftovers",
+    "name": "Leftovers",
+    "description": "Restores 1/16 max HP at end of each turn.",
+    "category": "held",
+    "effect": { "type": "held-heal", "value": 16 }
+  },
+  {
+    "id": "life-orb",
+    "name": "Life Orb",
+    "description": "Boosts move power by 30% but costs 10% max HP.",
+    "category": "held",
+    "effect": { "type": "held-life-orb", "value": 130 }
+  },
+  {
+    "id": "choice-band",
+    "name": "Choice Band",
+    "description": "Boosts Attack by 50% but locks into one move.",
+    "category": "held",
+    "effect": { "type": "held-choice", "value": 150 }
+  },
+  {
+    "id": "choice-specs",
+    "name": "Choice Specs",
+    "description": "Boosts Sp. Atk by 50% but locks into one move.",
+    "category": "held",
+    "effect": { "type": "held-choice", "value": 150 }
+  },
+  {
+    "id": "choice-scarf",
+    "name": "Choice Scarf",
+    "description": "Boosts Speed by 50% but locks into one move.",
+    "category": "held",
+    "effect": { "type": "held-choice", "value": 150 }
+  }
+]

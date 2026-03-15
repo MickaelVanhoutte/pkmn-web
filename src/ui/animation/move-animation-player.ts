@@ -582,6 +582,142 @@ export class MoveAnimationPlayer {
     }
   }
 
+  // ── Pokeball animations (switch-in / switch-out) ──
+
+  /**
+   * Animate a pokeball thrown from the trainer's side to the pokemon's position.
+   * The pokeball follows a parabolic arc with rotation, ending with a white pop flash.
+   */
+  async playPokeballThrow(player: number, slot: number, duration: number): Promise<void> {
+    const img = await preloadImage('./fx/pokeball.png');
+    const arenaSize = this.posResolver.getArenaSize();
+    const target = this.posResolver.getSlotCenter(player, slot);
+
+    // Start position: off-screen on the trainer's side
+    const start: CanvasPoint = player === 0
+      ? { x: -30, y: arenaSize.height * 0.8 }
+      : { x: arenaSize.width + 30, y: arenaSize.height * 0.15 };
+
+    // End position: pokemon slot center, adjusted down slightly (base of pokemon)
+    const end: CanvasPoint = { x: target.x, y: target.y + 15 };
+
+    const arcHeight = 80;
+    const startTime = performance.now();
+    const displayScale = 2; // 24px * 2 = 48px display
+
+    // Pokeball arc animation
+    await this.addRenderer((ctx) => {
+      const elapsed = performance.now() - startTime;
+      if (elapsed >= duration) return false;
+
+      const progress = elapsed / duration;
+      const eased = getEasing('easeOutQuad')(progress);
+
+      // Linear interpolation + parabolic arc
+      const x = start.x + (end.x - start.x) * eased;
+      const baseY = start.y + (end.y - start.y) * eased;
+      const arcOffset = -arcHeight * 4 * progress * (1 - progress);
+      const y = baseY + arcOffset;
+
+      // Rotation: 3 full spins
+      const rotation = progress * Math.PI * 6;
+
+      const w = img.width * displayScale;
+      const h = img.height * displayScale;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+
+      return true;
+    });
+
+    // Pop flash at arrival point
+    await this.playPopFlash(end, 150);
+  }
+
+  /**
+   * Animate a pokeball recall: brief flash at pokemon position, then pokeball
+   * arcs back to the trainer's side of the screen.
+   */
+  async playPokeballRecall(player: number, slot: number, duration: number): Promise<void> {
+    const img = await preloadImage('./fx/pokeball.png');
+    const arenaSize = this.posResolver.getArenaSize();
+    const origin = this.posResolver.getSlotCenter(player, slot);
+
+    // Start position: at the pokemon
+    const start: CanvasPoint = { x: origin.x, y: origin.y + 15 };
+
+    // End position: off-screen on the trainer's side
+    const end: CanvasPoint = player === 0
+      ? { x: -30, y: arenaSize.height * 0.8 }
+      : { x: arenaSize.width + 30, y: arenaSize.height * 0.15 };
+
+    // Brief pop flash at pokemon position (pokeball materializes)
+    await this.playPopFlash(start, 100);
+
+    const arcHeight = 60;
+    const startTime = performance.now();
+    const displayScale = 2;
+
+    // Pokeball arc animation (reverse — from pokemon to off-screen)
+    await this.addRenderer((ctx) => {
+      const elapsed = performance.now() - startTime;
+      if (elapsed >= duration) return false;
+
+      const progress = elapsed / duration;
+      const eased = getEasing('easeInQuad')(progress);
+
+      const x = start.x + (end.x - start.x) * eased;
+      const baseY = start.y + (end.y - start.y) * eased;
+      const arcOffset = -arcHeight * 4 * progress * (1 - progress);
+      const y = baseY + arcOffset;
+
+      // Rotation: 2 full spins for recall
+      const rotation = progress * Math.PI * 4;
+
+      const w = img.width * displayScale;
+      const h = img.height * displayScale;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+
+      return true;
+    });
+  }
+
+  /**
+   * Quick expanding white circle "pop" flash at a point.
+   */
+  private async playPopFlash(pos: CanvasPoint, duration: number): Promise<void> {
+    const startTime = performance.now();
+    const maxRadius = 35;
+
+    await this.addRenderer((ctx) => {
+      const elapsed = performance.now() - startTime;
+      if (elapsed >= duration) return false;
+
+      const progress = elapsed / duration;
+      const radius = maxRadius * getEasing('easeOutQuad')(progress);
+      const alpha = 1 - progress;
+
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      return true;
+    });
+  }
+
   // ── Audio ──
 
   private playAudio(moveName: string, part?: number): void {

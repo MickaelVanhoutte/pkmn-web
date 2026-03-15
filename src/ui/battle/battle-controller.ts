@@ -335,6 +335,49 @@ export class BattleController {
       }
     }
 
+    // Switch / Faint animations
+    if (update.switchAnim) {
+      const { action, player, slot, speciesId } = update.switchAnim;
+      const side = player === 0 ? 'player' : 'opponent';
+      const sprite = this.ui.sprites[side][slot];
+
+      if (action === 'switch-in' && sprite) {
+        // 1. Set sprite image (hidden — switchInAppear will make it visible)
+        if (speciesId) sprite.updateSprite(speciesId, player === 0 ? 'back' : 'front');
+        // 2. Pokeball throw on canvas (~500ms)
+        if (this.animPlayer) await this.animPlayer.playPokeballThrow(player, slot, 500);
+        // 3. Sprite appears: scale up + color fade (~700ms)
+        if (this.spriteAnimator) {
+          await this.spriteAnimator.switchInAppear({ player, slot }, 700);
+        } else {
+          sprite.setVisible(true);
+        }
+      }
+
+      if (action === 'switch-out' && sprite) {
+        // Skip animation if sprite is already hidden (e.g. after faint)
+        const alreadyHidden = sprite.el.style.visibility === 'hidden';
+        if (!alreadyHidden) {
+          // 1. Sprite shrinks + whiteout (~300ms)
+          if (this.spriteAnimator) {
+            await this.spriteAnimator.switchOutShrink({ player, slot }, 300);
+          }
+          // 2. Pokeball recall on canvas (~400ms)
+          if (this.animPlayer) await this.animPlayer.playPokeballRecall(player, slot, 400);
+        }
+        // 3. Ensure hidden
+        sprite.setVisible(false);
+      }
+
+      if (action === 'faint') {
+        // 1. Darken + fall (~1000ms)
+        if (this.spriteAnimator && sprite) {
+          await this.spriteAnimator.faintFall({ player, slot }, 1000);
+        }
+        if (sprite) sprite.setVisible(false);
+      }
+    }
+
     // Sprite update
     if (update.spriteUpdate) {
       const { player, slot, action, speciesId } = update.spriteUpdate;

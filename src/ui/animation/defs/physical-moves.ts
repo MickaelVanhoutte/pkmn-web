@@ -210,10 +210,12 @@ export const physicalMoves: MoveAnimationDef[] = [
       {
         type: 'parallel',
         phases: [
-          { type: 'screen-shake', intensity: 12, duration: 800, axis: 'both' },
-          { type: 'camera-zoom', scale: 1.03, duration: 800 },
-          { type: 'color-grade', color: '#8B7355', opacity: 0.06, duration: 800 },
-          { type: 'particles', image: './fx/rock.png', count: 8, origin: 'screen', spread: 200, duration: 800, gravity: -4, fadeOut: true, scale: [0.4, 1.0], rotation: true, velocity: { x: [-3, 3], y: [-6, -2] } },
+          // Screen shake lasts the entire sound effect (~7s), intensity decays naturally
+          { type: 'screen-shake', intensity: 14, duration: 7000, axis: 'both' },
+          { type: 'camera-zoom', scale: 1.03, duration: 1200 },
+          { type: 'color-grade', color: '#8B7355', opacity: 0.1, duration: 7000 },
+          // Big initial burst of rocks
+          { type: 'particles', image: './fx/rock.png', count: 12, origin: 'screen', spread: 250, duration: 2000, gravity: -4, fadeOut: true, scale: [0.4, 1.0], rotation: true, velocity: { x: [-3, 3], y: [-6, -2] } },
         ],
       },
     ],

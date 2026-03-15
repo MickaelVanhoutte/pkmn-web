@@ -46,6 +46,13 @@ export interface EventUIUpdate {
     action: 'create' | 'break';
     target: BattlePosition;
   };
+  /** Switch-in / switch-out / faint choreography — pokeball + sprite transitions */
+  switchAnim?: {
+    action: 'switch-in' | 'switch-out' | 'faint';
+    player: PlayerIndex;
+    slot: number;
+    speciesId?: string;
+  };
   weatherEffect?: {
     action: 'start' | 'stop';
     weather: string;
@@ -286,12 +293,12 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'faint':
       return {
         logText: `${event.pokemonName} fainted!`,
-        spriteUpdate: {
+        switchAnim: {
+          action: 'faint',
           player: event.target.player,
           slot: event.target.slot,
-          action: 'hide',
         },
-        delay: 800,
+        delay: 100,
       };
 
     case 'switch-in':
@@ -299,10 +306,10 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
         logText: event.player === 0
           ? `Go! ${event.pokemonName}!`
           : `${event.pokemonName} was sent out!`,
-        spriteUpdate: {
+        switchAnim: {
+          action: 'switch-in',
           player: event.player,
           slot: event.slot,
-          action: 'show',
           speciesId: event.speciesId,
         },
         infoUpdate: {
@@ -315,7 +322,7 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           status: null,
         },
         playCry: event.speciesId,
-        delay: 600,
+        delay: 100,
       };
 
     case 'switch-out':
@@ -323,12 +330,12 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
         logText: event.player === 0
           ? `${event.pokemonName}, come back!`
           : `${event.pokemonName} was withdrawn!`,
-        spriteUpdate: {
+        switchAnim: {
+          action: 'switch-out',
           player: event.player,
           slot: event.slot,
-          action: 'hide',
         },
-        delay: 400,
+        delay: 100,
       };
 
     case 'status-applied':

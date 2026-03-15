@@ -283,4 +283,104 @@ export class SpriteAnimator {
     const img = el.querySelector('img');
     return img?.src ?? null;
   }
+
+  // ── Switch / Faint animations ──
+
+  private static readonly DROP_SHADOW = 'drop-shadow(2px 4px 0 rgba(0,0,0,0.35))';
+
+  /**
+   * Switch-in appear: sprite starts at scale(0) + white, grows to full size
+   * with color fading in. Container must have visibility set externally beforehand.
+   */
+  async switchInAppear(who: BattlePosition, duration: number): Promise<void> {
+    const el = this.getSlot(who);
+    if (!el) return;
+    const img = el.querySelector('img') as HTMLElement | null;
+
+    // Initial state: invisible scale, white filter
+    el.style.transform = 'scale(0)';
+    el.style.visibility = 'visible';
+    if (img) img.style.filter = `brightness(10) ${SpriteAnimator.DROP_SHADOW}`;
+
+    // Force reflow so the initial state is applied before transitioning
+    el.offsetHeight;
+
+    // Scale up with overshoot + brightness fade in parallel
+    const brightnessDelay = duration * 0.2;
+    const brightnessDuration = duration * 0.8;
+
+    await Promise.all([
+      tween(0, 1, duration, getEasing('easeOutBack'), (s) => {
+        el.style.transform = `scale(${s})`;
+      }),
+      // Brightness starts slightly after scale (color fades in as it grows)
+      delay(brightnessDelay).then(() => {
+        if (!img) return;
+        return tween(10, 1, brightnessDuration, getEasing('easeOutCubic'), (b) => {
+          img.style.filter = `brightness(${b}) ${SpriteAnimator.DROP_SHADOW}`;
+        });
+      }),
+    ]);
+
+    // Clean up — let CSS classes handle normal state
+    el.style.transform = '';
+    if (img) img.style.filter = '';
+  }
+
+  /**
+   * Switch-out shrink: sprite shrinks to scale(0) while going white.
+   * Sets visibility hidden at the end.
+   */
+  async switchOutShrink(who: BattlePosition, duration: number): Promise<void> {
+    const el = this.getSlot(who);
+    if (!el) return;
+    const img = el.querySelector('img') as HTMLElement | null;
+
+    await Promise.all([
+      tween(1, 0, duration, getEasing('easeInBack'), (s) => {
+        el.style.transform = `scale(${s})`;
+      }),
+      // Brightness ramps up faster than scale shrinks
+      img ? tween(1, 10, duration * 0.7, getEasing('easeInQuad'), (b) => {
+        img.style.filter = `brightness(${b}) ${SpriteAnimator.DROP_SHADOW}`;
+      }) : Promise.resolve(),
+    ]);
+
+    el.style.visibility = 'hidden';
+    el.style.transform = '';
+    if (img) img.style.filter = '';
+  }
+
+  /**
+   * Faint fall: sprite darkens/desaturates, then falls downward and fades out.
+   * Sets visibility hidden at the end.
+   */
+  async faintFall(who: BattlePosition, duration: number): Promise<void> {
+    const el = this.getSlot(who);
+    if (!el) return;
+    const img = el.querySelector('img') as HTMLElement | null;
+
+    // Phase 1: Darken + desaturate
+    if (img) {
+      img.style.filter = `grayscale(1) brightness(0.4) ${SpriteAnimator.DROP_SHADOW}`;
+    }
+    await delay(200);
+
+    // Phase 2: Fall down + fade out
+    const fallDuration = duration - 200;
+    await Promise.all([
+      tween(0, 150, fallDuration, getEasing('easeInCubic'), (y) => {
+        el.style.transform = `translateY(${y}px)`;
+      }),
+      tween(1, 0, fallDuration, getEasing('easeInQuad'), (a) => {
+        el.style.opacity = `${a}`;
+      }),
+    ]);
+
+    // Clean up
+    el.style.visibility = 'hidden';
+    el.style.transform = '';
+    el.style.opacity = '';
+    if (img) img.style.filter = '';
+  }
 }

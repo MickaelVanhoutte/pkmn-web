@@ -138,6 +138,16 @@ export interface PausePhase {
   duration: number;
 }
 
+export interface StartWeatherPhase {
+  type: 'start-weather';
+  weather: string;
+}
+
+export interface StartTerrainPhase {
+  type: 'start-terrain';
+  terrain: string;
+}
+
 export interface ParallelPhase {
   type: 'parallel';
   phases: AnimationPhase[];
@@ -157,6 +167,8 @@ export type AnimationPhase =
   | AfterimagePhase
   | AudioPhase
   | PausePhase
+  | StartWeatherPhase
+  | StartTerrainPhase
   | ParallelPhase;
 
 // ── Top-level move definition ──

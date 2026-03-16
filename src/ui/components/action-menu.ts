@@ -1,13 +1,15 @@
 import { el } from '../util/dom';
+import { audioManager } from '../util/audio';
 
 export interface ActionMenuComponent {
   el: HTMLElement;
-  show(): void;
+  show(canGoBack?: boolean): void;
   hide(): void;
   onFight: (() => void) | null;
   onPokemon: (() => void) | null;
   onBag: (() => void) | null;
   onRun: (() => void) | null;
+  onBack: (() => void) | null;
 }
 
 export function createActionMenu(): ActionMenuComponent {
@@ -23,8 +25,13 @@ export function createActionMenu(): ActionMenuComponent {
   const bagBtn = el('button', { class: 'action-btn bag' }, ['BAG']);
   const runBtn = el('button', { class: 'action-btn run' }, ['RUN']);
 
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-arrow-btn';
+  backBtn.style.display = 'none';
+  backBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
+
   const grid = el('div', { class: 'action-grid' }, [fightBtn, pokemonBtn, bagBtn, runBtn]);
-  const container = el('div', { class: 'action-panel' }, [grid]);
+  const container = el('div', { class: 'action-panel' }, [grid, backBtn]);
 
   const component: ActionMenuComponent = {
     el: container,
@@ -32,8 +39,10 @@ export function createActionMenu(): ActionMenuComponent {
     onPokemon: null,
     onBag: null,
     onRun: null,
-    show() {
+    onBack: null,
+    show(canGoBack?: boolean) {
       container.style.display = '';
+      backBtn.style.display = canGoBack ? '' : 'none';
     },
     hide() {
       container.style.display = 'none';
@@ -41,19 +50,28 @@ export function createActionMenu(): ActionMenuComponent {
   };
 
   fightBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onFight?.();
   });
 
   pokemonBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onPokemon?.();
   });
 
   bagBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onBag?.();
   });
 
   runBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onRun?.();
+  });
+
+  backBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
+    component.onBack?.();
   });
 
   return component;

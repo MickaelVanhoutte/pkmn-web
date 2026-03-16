@@ -46,6 +46,7 @@ export function createInfoPanel(side: 'player' | 'opponent'): InfoPanelComponent
   }
 
   const root = el('div', { class: `info-panel ${side}` }, children);
+  root.style.display = 'none';
 
   function update(data: {
     name: string;

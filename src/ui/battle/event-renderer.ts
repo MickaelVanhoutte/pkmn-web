@@ -206,7 +206,7 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           attacker: event.user,
           targets: event.targets,
         },
-        delay: 100, // Short delay — animation handles timing
+        delay: 0, // No delay — animation already awaited; damage should follow immediately
       };
 
     case 'damage': {
@@ -298,7 +298,7 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           player: event.target.player,
           slot: event.target.slot,
         },
-        delay: 100,
+        delay: 600,
       };
 
     case 'switch-in':
@@ -322,7 +322,7 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           status: null,
         },
         playCry: event.speciesId,
-        delay: 100,
+        delay: 800,
       };
 
     case 'switch-out':
@@ -335,7 +335,7 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           player: event.player,
           slot: event.slot,
         },
-        delay: 100,
+        delay: 500,
       };
 
     case 'status-applied':
@@ -432,17 +432,17 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
     case 'critical-hit':
       return {
         logText: 'A critical hit!',
-        delay: 300,
+        delay: 0,
       };
 
     case 'type-effectiveness':
       switch (event.effectiveness) {
         case 'super-effective':
-          return { logText: "It's super effective!", delay: 400 };
+          return { logText: "It's super effective!", delay: 0 };
         case 'not-very-effective':
-          return { logText: "It's not very effective...", delay: 400 };
+          return { logText: "It's not very effective...", delay: 0 };
         case 'immune':
-          return { logText: "It doesn't affect the target...", delay: 400 };
+          return { logText: "It doesn't affect the target...", delay: 0 };
         case 'neutral':
         default:
           return { delay: 0 };

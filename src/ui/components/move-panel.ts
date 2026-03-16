@@ -1,6 +1,7 @@
 import type { TypeName } from '@/types/common';
 import { el, clearChildren } from '../util/dom';
 import { getTypeColor, getTypeTextColor } from '../util/type-colors';
+import { audioManager } from '../util/audio';
 
 export interface MovePanelComponent {
   el: HTMLElement;
@@ -49,6 +50,7 @@ export function createMovePanel(): MovePanelComponent {
 
         const moveIndex = move.moveIndex;
         btn.addEventListener('click', () => {
+          audioManager.playUiSfx('menu');
           component.onMoveSelect?.(moveIndex);
         });
 
@@ -68,6 +70,7 @@ export function createMovePanel(): MovePanelComponent {
   };
 
   backBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onBack?.();
   });
 

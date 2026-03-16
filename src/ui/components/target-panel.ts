@@ -1,7 +1,6 @@
 import type { BattlePosition } from '@/types/common';
 import { el, clearChildren } from '../util/dom';
-import { getSpriteUrl } from '../util/sprite-url';
-import { createHpBar } from './hp-bar';
+import { audioManager } from '../util/audio';
 
 export interface TargetOption {
   position: BattlePosition;
@@ -21,14 +20,13 @@ export interface TargetPanelComponent {
 }
 
 export function createTargetPanel(): TargetPanelComponent {
-  const header = el('div', { class: 'target-panel-header' }, ['Choose a target']);
-  const list = el('div', { class: 'target-list' });
+  const grid = el('div', { class: 'target-grid' });
 
   const backBtn = document.createElement('button');
   backBtn.className = 'back-arrow-btn';
   backBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>';
 
-  const container = el('div', { class: 'target-panel' }, [header, list, backBtn]);
+  const container = el('div', { class: 'target-panel' }, [grid, backBtn]);
   container.style.display = 'none';
 
   const component: TargetPanelComponent = {
@@ -37,26 +35,16 @@ export function createTargetPanel(): TargetPanelComponent {
     onBack: null,
 
     show(targets) {
-      clearChildren(list);
+      clearChildren(grid);
 
-      // Separate foes and allies
-      const foes = targets.filter(t => !t.isAlly);
+      // Foes first (sorted by descending slot so left-to-right matches battlefield),
+      // then allies — fills 2x2 grid
+      const foes = targets.filter(t => !t.isAlly).sort((a, b) => b.position.slot - a.position.slot);
       const allies = targets.filter(t => t.isAlly);
+      const ordered = [...foes, ...allies];
 
-      if (foes.length > 0) {
-        const foeLabel = el('div', { class: 'target-side-label' }, ['Opponent']);
-        list.appendChild(foeLabel);
-        for (const target of foes) {
-          list.appendChild(createTargetEntry(target, component));
-        }
-      }
-
-      if (allies.length > 0) {
-        const allyLabel = el('div', { class: 'target-side-label' }, ['Ally']);
-        list.appendChild(allyLabel);
-        for (const target of allies) {
-          list.appendChild(createTargetEntry(target, component));
-        }
+      for (const target of ordered) {
+        grid.appendChild(createTargetBtn(target, component));
       }
 
       container.style.display = '';
@@ -68,26 +56,27 @@ export function createTargetPanel(): TargetPanelComponent {
   };
 
   backBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onBack?.();
   });
 
   return component;
 }
 
-function createTargetEntry(target: TargetOption, component: TargetPanelComponent): HTMLElement {
-  const spriteImg = document.createElement('img');
-  spriteImg.className = 'switch-sprite';
-  spriteImg.src = getSpriteUrl(target.speciesId, 'front');
-  spriteImg.alt = target.pokemonName;
+function createTargetBtn(target: TargetOption, component: TargetPanelComponent): HTMLElement {
+  const label = target.isAlly ? 'ALLY' : 'FOE';
+  const labelSpan = el('span', { class: 'target-label' }, [label]);
+  const nameSpan = el('span', { class: 'target-name' }, [target.pokemonName]);
 
-  const hpBar = createHpBar(target.currentHp, target.maxHp);
-  const nameSpan = el('span', { class: 'switch-pokemon-name' }, [target.pokemonName]);
+  const btn = document.createElement('button');
+  btn.className = `action-btn ${target.isAlly ? 'bag' : 'fight'}`;
+  btn.appendChild(nameSpan);
+  btn.appendChild(labelSpan);
 
-  const entry = el('div', { class: 'switch-entry' }, [spriteImg, nameSpan, hpBar.el]);
-
-  entry.addEventListener('click', () => {
+  btn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onTargetSelect?.(target.position);
   });
 
-  return entry;
+  return btn;
 }

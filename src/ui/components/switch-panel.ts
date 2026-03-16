@@ -1,6 +1,7 @@
 import { el, clearChildren } from '../util/dom';
 import { getSpriteUrl } from '../util/sprite-url';
 import { createHpBar } from './hp-bar';
+import { audioManager } from '../util/audio';
 
 export interface SwitchPanelComponent {
   el: HTMLElement;
@@ -83,6 +84,7 @@ export function createSwitchPanel(): SwitchPanelComponent {
         } else {
           const teamIndex = mon.teamIndex;
           entry.addEventListener('click', () => {
+            audioManager.playUiSfx('menu');
             component.onSwitch?.(teamIndex);
           });
         }
@@ -99,6 +101,7 @@ export function createSwitchPanel(): SwitchPanelComponent {
   };
 
   backBtn.addEventListener('click', () => {
+    audioManager.playUiSfx('menu');
     component.onBack?.();
   });
 

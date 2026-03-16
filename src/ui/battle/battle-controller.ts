@@ -12,6 +12,7 @@ import type { MoveAnimationPlayer } from '../animation/move-animation-player';
 import type { SpriteAnimator } from '../animation/sprite-animator';
 import { getMoveAnimation, getChargeAnimation } from '../animation/defs';
 import type { TargetOption } from '../components/target-panel';
+import type { FieldStatusChipComponent } from '../components/field-status-chip';
 
 // The UI components this controller needs to interact with
 export interface BattleUI {
@@ -24,11 +25,12 @@ export interface BattleUI {
     opponent: { update(d: { name: string; level: number; currentHp: number; maxHp: number; status: MajorStatus | null }): void; show(): void; hide(): void }[];
   };
   battleLog: { addEntry(text: string): void; clear(): void };
-  actionMenu: { show(): void; hide(): void; onFight: (() => void) | null; onPokemon: (() => void) | null; onBag: (() => void) | null; onRun: (() => void) | null };
+  actionMenu: { show(canGoBack?: boolean): void; hide(): void; onFight: (() => void) | null; onPokemon: (() => void) | null; onBag: (() => void) | null; onRun: (() => void) | null; onBack: (() => void) | null };
   movePanel: { show(moves: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[]): void; hide(): void; onMoveSelect: ((idx: number) => void) | null; onBack: (() => void) | null };
   switchPanel: { show(pokemon: { teamIndex: number; pokemonName: string; speciesId: string; currentHp: number; maxHp: number; isActive?: boolean; isFainted?: boolean }[]): void; hide(): void; onSwitch: ((idx: number) => void) | null; onBack: (() => void) | null };
   targetPanel: { show(targets: TargetOption[]): void; hide(): void; onTargetSelect: ((position: BattlePosition) => void) | null; onBack: (() => void) | null };
   turnCounter: HTMLElement;
+  fieldStatusChip?: FieldStatusChipComponent;
   onBattleEnd: ((winner: PlayerIndex | null) => void) | null;
 }
 
@@ -56,7 +58,7 @@ export class BattleController {
   constructor(config: BattleConfig, ui: BattleUI, eventDelay?: number) {
     this.engine = new BattleEngine(config);
     this.ui = ui;
-    this.eventDelay = eventDelay ?? 400;
+    this.eventDelay = eventDelay ?? 1000;
   }
 
   setAnimationPlayer(player: MoveAnimationPlayer): void {
@@ -72,6 +74,7 @@ export class BattleController {
   }
 
   async start(): Promise<void> {
+    audioManager.playMusic('./audio/music/battle1.mp3', true);
     const events = this.engine.startBattle();
     await this.processEvents(events);
     await this.mainLoop();
@@ -101,7 +104,8 @@ export class BattleController {
       await this.handleForcedSwitches();
     }
 
-    // Battle over
+    // Battle over — fade out music before transitioning
+    audioManager.stopMusic(2000);
     const winner = this.engine.getWinner();
     this.ui.onBattleEnd?.(winner);
   }
@@ -111,17 +115,28 @@ export class BattleController {
   private async collectPlayerActions(): Promise<TurnAction[]> {
     const availableActions = this.engine.getAvailableActions(0);
     const actions: TurnAction[] = [];
+    let i = 0;
 
-    for (const slotInfo of availableActions) {
-      const action = await this.waitForPlayerAction(slotInfo.slot);
-      actions.push(action);
+    while (i < availableActions.length) {
+      const slotInfo = availableActions[i];
+      const canGoBack = i > 0;
+      const action = await this.waitForPlayerAction(slotInfo.slot, canGoBack);
+
+      if (action === null) {
+        // User pressed back — undo previous action
+        actions.pop();
+        i--;
+      } else {
+        actions.push(action);
+        i++;
+      }
     }
 
     return actions;
   }
 
-  private waitForPlayerAction(slot: number): Promise<TurnAction> {
-    return new Promise<TurnAction>(resolve => {
+  private waitForPlayerAction(slot: number, canGoBack: boolean = false): Promise<TurnAction | null> {
+    return new Promise<TurnAction | null>(resolve => {
       const available = this.engine.getAvailableActions(0);
       const slotInfo = available.find(a => a.slot === slot);
       if (!slotInfo) {
@@ -131,7 +146,14 @@ export class BattleController {
       }
 
       this.hideAllPanels();
-      this.ui.actionMenu.show();
+      this.ui.actionMenu.show(canGoBack);
+
+      // Back -> undo previous slot's action
+      this.ui.actionMenu.onBack = canGoBack ? () => {
+        this.hideAllPanels();
+        this.cleanupCallbacks();
+        resolve(null);
+      } : null;
 
       // Fight -> show move panel
       this.ui.actionMenu.onFight = () => {
@@ -157,7 +179,7 @@ export class BattleController {
         this.ui.movePanel.onBack = () => {
           this.ui.movePanel.hide();
           // Re-show action menu
-          this.waitForPlayerAction(slot).then(resolve);
+          this.waitForPlayerAction(slot, canGoBack).then(resolve);
         };
       };
 
@@ -179,7 +201,7 @@ export class BattleController {
 
         this.ui.switchPanel.onBack = () => {
           this.ui.switchPanel.hide();
-          this.waitForPlayerAction(slot).then(resolve);
+          this.waitForPlayerAction(slot, canGoBack).then(resolve);
         };
       };
 
@@ -457,21 +479,25 @@ export class BattleController {
     if (update.weatherEffect && this.animPlayer) {
       if (update.weatherEffect.action === 'start') {
         await this.animPlayer.startWeather(update.weatherEffect.weather);
+        this.ui.fieldStatusChip?.setWeather(update.weatherEffect.weather);
       } else {
         this.animPlayer.stopWeather();
+        this.ui.fieldStatusChip?.setWeather(null);
       }
     }
     if (update.terrainEffect && this.animPlayer) {
       if (update.terrainEffect.action === 'start') {
         await this.animPlayer.startTerrain(update.terrainEffect.terrain);
+        this.ui.fieldStatusChip?.setTerrain(update.terrainEffect.terrain);
       } else {
         this.animPlayer.stopTerrain();
+        this.ui.fieldStatusChip?.setTerrain(null);
       }
     }
 
     // Audio
     if (update.playCry) {
-      audioManager.playCry(update.playCry);
+      await audioManager.playCry(update.playCry);
     }
     if (update.playMoveSfx) {
       audioManager.playMoveSfx(update.playMoveSfx);
@@ -492,6 +518,7 @@ export class BattleController {
     this.ui.actionMenu.onPokemon = null;
     this.ui.actionMenu.onBag = null;
     this.ui.actionMenu.onRun = null;
+    this.ui.actionMenu.onBack = null;
     this.ui.movePanel.onMoveSelect = null;
     this.ui.movePanel.onBack = null;
     this.ui.switchPanel.onSwitch = null;
@@ -518,7 +545,7 @@ export class BattleController {
     slot: number,
     moveIndex: number,
     moveTarget: MoveTarget,
-    resolve: (action: TurnAction) => void,
+    resolve: (action: TurnAction | null) => void,
   ): void {
     const state = this.engine.getState();
     const playerState = state.players[0];

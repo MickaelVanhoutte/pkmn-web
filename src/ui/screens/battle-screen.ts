@@ -13,7 +13,9 @@ import { CanvasOverlay } from '../animation/canvas-overlay';
 import { PositionResolver } from '../animation/position-resolver';
 import { SpriteAnimator } from '../animation/sprite-animator';
 import { MoveAnimationPlayer } from '../animation/move-animation-player';
+import { createFieldStatusChip, type FieldStatusChipComponent } from '../components/field-status-chip';
 import { IS_DEBUG } from '../util/debug';
+import { audioManager } from '../util/audio';
 import type { NavigateFn } from '../main';
 
 const BACKGROUNDS = [
@@ -63,6 +65,9 @@ export function showBattleScreen(
   const turnCounter = el('span', { class: 'turn-counter' });
   turnCounter.style.display = 'none';
 
+  // Field status chips (weather/terrain) — positioned absolute in top-right
+  const fieldStatusChip: FieldStatusChipComponent = createFieldStatusChip();
+
   // ── Build DOM ──
   const arenaClasses = `battle-arena${isDoubles ? ' doubles' : ''}`;
   const arena = el('div', { class: arenaClasses });
@@ -80,7 +85,7 @@ export function showBattleScreen(
     targetPanel.el,
   ]);
 
-  const battleContainer = el('div', { class: 'battle-container' }, [arena, battleLog.el, actionBox, switchPanel.el]);
+  const battleContainer = el('div', { class: 'battle-container' }, [fieldStatusChip.el, arena, battleLog.el, actionBox, switchPanel.el]);
   // Background on container so it extends behind buttons
   battleContainer.style.backgroundImage = `url('./backgrounds/${bgName}.png')`;
   container.appendChild(battleContainer);
@@ -116,6 +121,7 @@ export function showBattleScreen(
     switchPanel,
     targetPanel,
     turnCounter,
+    fieldStatusChip,
     onBattleEnd: (winner: PlayerIndex | null) => {
       setTimeout(() => {
         if (disposed) return;
@@ -137,12 +143,17 @@ export function showBattleScreen(
     });
   }
 
+  // ── Preload audio for both teams ──
+  const allSpeciesIds = config.players.flatMap(p => p.team.map(mon => mon.speciesId));
+  audioManager.preloadCries(allSpeciesIds);
+
   // ── Start the battle ──
   let disposed = false;
   controller.start();
 
   return () => {
     disposed = true;
+    audioManager.stopMusic();
     canvasOverlay.destroy();
   };
 }

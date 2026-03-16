@@ -25,6 +25,16 @@
     inset 0 0 0 1px rgba(0, 0, 0, 0.5),
     0 2px 8px rgba(0, 0, 0, 0.6);
   box-sizing: border-box;
+  animation: panel-float 3s ease-in-out infinite;
+}
+
+.info-panel.opponent {
+  animation-delay: -1.5s;
+}
+
+@keyframes panel-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
 }
 
 @media (min-width: 600px) {
@@ -576,35 +586,36 @@
   flex: 1 1 100%;
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  gap: 3px;
-  overflow-y: auto;
+  padding: 6px;
   min-width: 0;
   position: relative;
 }
 
-.target-panel-header {
-  font-size: 7px;
-  color: var(--text-secondary);
-  text-shadow: var(--text-shadow);
-  text-transform: uppercase;
-  margin-bottom: 2px;
+.target-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  flex: 1;
 }
 
-.target-list {
-  display: flex;
+.target-grid .action-btn {
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
-/* Label row for opponent / ally sides */
-.target-side-label {
-  font-size: 6px;
+.target-name {
+  font-size: 0.9em;
+  color: var(--text-primary);
+  text-shadow: var(--text-shadow);
+  text-transform: uppercase;
+}
+
+.target-label {
+  font-size: 0.6em;
   color: var(--text-secondary);
   text-shadow: var(--text-shadow);
   text-transform: uppercase;
-  text-align: center;
-  margin-top: 2px;
 }
 
 /* ==========================================================================

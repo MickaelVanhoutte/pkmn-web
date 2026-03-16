@@ -79,6 +79,53 @@
   opacity: 0.6;
 }
 
+/* ── Field-status chips (weather/terrain indicators) ────────────────────── */
+
+.field-status-chips {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  flex-direction: column;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.field-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+  animation: chip-appear 0.3s ease-out;
+}
+
+@keyframes chip-appear {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Weather chip colors */
+.field-chip.chip-rain      { background: rgba(34, 68, 170, 0.6); border-color: rgba(68, 136, 255, 0.3); }
+.field-chip.chip-sun       { background: rgba(180, 140, 20, 0.6); border-color: rgba(255, 204, 68, 0.3); }
+.field-chip.chip-sandstorm { background: rgba(139, 115, 85, 0.6); border-color: rgba(180, 155, 120, 0.3); }
+.field-chip.chip-hail      { background: rgba(80, 140, 200, 0.6); border-color: rgba(136, 204, 255, 0.3); }
+
+/* Terrain chip colors */
+.field-chip.chip-electric  { background: rgba(180, 160, 20, 0.6); border-color: rgba(255, 238, 68, 0.3); }
+.field-chip.chip-grassy    { background: rgba(40, 140, 40, 0.6); border-color: rgba(68, 204, 68, 0.3); }
+.field-chip.chip-psychic   { background: rgba(160, 50, 140, 0.6); border-color: rgba(255, 102, 204, 0.3); }
+.field-chip.chip-misty     { background: rgba(160, 80, 140, 0.6); border-color: rgba(255, 136, 204, 0.3); }
+
 /* ── Arena ────────────────────────────────────────────────────────────────── */
 
 .battle-arena {
@@ -200,20 +247,81 @@
 .sprite-slot[class*="player"] .pokemon-sprite {
   transform: scale(1.3);
   transform-origin: bottom center;
+  animation: sprite-idle-player 4s ease-in-out infinite;
 }
 
 /* Opponent sprites are front sprites (slightly smaller) */
 .sprite-slot[class*="opponent"] .pokemon-sprite {
   transform: scale(1.1);
   transform-origin: bottom center;
+  animation: sprite-idle-opponent 4.5s ease-in-out infinite;
+}
+
+@keyframes sprite-idle-player {
+  0%, 100% { transform: scale(1.3) translateY(0); }
+  50%      { transform: scale(1.3) translateY(-2px); }
+}
+
+@keyframes sprite-idle-opponent {
+  0%, 100% { transform: scale(1.1) translateY(0); }
+  50%      { transform: scale(1.1) translateY(-2px); }
+}
+
+/* Eager shake — toggled on/off by JS */
+.pokemon-sprite.eager {
+  animation: sprite-eager-player 0.15s ease-in-out 3 !important;
+}
+
+.sprite-slot[class*="opponent"] .pokemon-sprite.eager {
+  animation: sprite-eager-opponent 0.15s ease-in-out 3 !important;
+}
+
+@keyframes sprite-eager-player {
+  0%, 100% { transform: scale(1.3) translateX(0); }
+  25%      { transform: scale(1.3) translateX(-2px); }
+  75%      { transform: scale(1.3) translateX(2px); }
+}
+
+@keyframes sprite-eager-opponent {
+  0%, 100% { transform: scale(1.1) translateX(0); }
+  25%      { transform: scale(1.1) translateX(-2px); }
+  75%      { transform: scale(1.1) translateX(2px); }
 }
 
 @media (min-width: 600px) {
   .sprite-slot[class*="player"] .pokemon-sprite {
     transform: scale(2);
+    animation-name: sprite-idle-player-lg;
   }
   .sprite-slot[class*="opponent"] .pokemon-sprite {
     transform: scale(1.6);
+    animation-name: sprite-idle-opponent-lg;
+  }
+
+  @keyframes sprite-idle-player-lg {
+    0%, 100% { transform: scale(2) translateY(0); }
+    50%      { transform: scale(2) translateY(-2px); }
+  }
+  @keyframes sprite-idle-opponent-lg {
+    0%, 100% { transform: scale(1.6) translateY(0); }
+    50%      { transform: scale(1.6) translateY(-2px); }
+  }
+
+  .pokemon-sprite.eager {
+    animation: sprite-eager-player-lg 0.15s ease-in-out 3 !important;
+  }
+  .sprite-slot[class*="opponent"] .pokemon-sprite.eager {
+    animation: sprite-eager-opponent-lg 0.15s ease-in-out 3 !important;
+  }
+  @keyframes sprite-eager-player-lg {
+    0%, 100% { transform: scale(2) translateX(0); }
+    25%      { transform: scale(2) translateX(-3px); }
+    75%      { transform: scale(2) translateX(3px); }
+  }
+  @keyframes sprite-eager-opponent-lg {
+    0%, 100% { transform: scale(1.6) translateX(0); }
+    25%      { transform: scale(1.6) translateX(-3px); }
+    75%      { transform: scale(1.6) translateX(3px); }
   }
 }
 

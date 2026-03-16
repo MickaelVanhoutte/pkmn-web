@@ -114,20 +114,15 @@ export const statusMoves: MoveAnimationDef[] = [
   },
 
   // ── Rain Dance ──
+  // Persistent weather effect starts immediately; audio plays alongside
   {
     moveId: 'rain-dance',
     phases: [
+      { type: 'start-weather', weather: 'rain' },
       { type: 'audio', moveName: 'Rain Dance', part: 1 },
       { type: 'pause', duration: 200 },
       { type: 'audio', moveName: 'Rain Dance', part: 2 },
-      {
-        type: 'parallel',
-        phases: [
-          { type: 'particles', image: './fx/elements/water.png', count: 12, origin: 'screen', spread: 300, duration: 1000, gravity: 6, fadeOut: true, scale: [0.1, 0.3], velocity: { x: [-1, 1], y: [3, 6] } },
-          { type: 'color-grade', color: '#2244aa', opacity: 0.08, duration: 1000 },
-          { type: 'lighting', color: '#4488ff', at: 'screen', radius: 300, intensity: 0.2, duration: 1000 },
-        ],
-      },
+      { type: 'pause', duration: 300 },
       { type: 'audio', moveName: 'Rain Dance' },
     ],
   },
@@ -136,16 +131,8 @@ export const statusMoves: MoveAnimationDef[] = [
   {
     moveId: 'sunny-day',
     phases: [
+      { type: 'start-weather', weather: 'sun' },
       { type: 'audio', moveName: 'Sunny Day' },
-      {
-        type: 'parallel',
-        phases: [
-          { type: 'color-grade', color: '#ffcc44', opacity: 0.1, duration: 800 },
-          { type: 'particles', image: './fx/shine.png', count: 6, origin: 'screen', spread: 250, duration: 800, gravity: 2, fadeOut: true, scale: [0.3, 0.7], blend: 'lighter', velocity: { x: [-1, 1], y: [1, 3] } },
-          { type: 'lighting', color: '#ffdd44', at: 'screen', radius: 300, intensity: 0.4, duration: 800 },
-          { type: 'camera-zoom', scale: 1.02, duration: 600 },
-        ],
-      },
     ],
   },
 
@@ -153,16 +140,10 @@ export const statusMoves: MoveAnimationDef[] = [
   {
     moveId: 'sandstorm',
     phases: [
+      { type: 'start-weather', weather: 'sandstorm' },
       { type: 'audio', moveName: 'Sandstorm', part: 1 },
       { type: 'audio', moveName: 'Sandstorm', part: 2 },
-      {
-        type: 'parallel',
-        phases: [
-          { type: 'particles', image: './fx/rock.png', count: 10, origin: 'screen', spread: 300, duration: 1000, gravity: 0, drag: 0.005, fadeOut: true, scale: [0.2, 0.8], rotation: true, velocity: { x: [3, 8], y: [-1, 1] } },
-          { type: 'color-grade', color: '#8B7355', opacity: 0.08, duration: 1000 },
-          { type: 'screen-shake', intensity: 2, duration: 600, axis: 'x' },
-        ],
-      },
+      { type: 'pause', duration: 300 },
       { type: 'audio', moveName: 'Sandstorm' },
     ],
   },
@@ -171,15 +152,8 @@ export const statusMoves: MoveAnimationDef[] = [
   {
     moveId: 'hail',
     phases: [
+      { type: 'start-weather', weather: 'hail' },
       { type: 'audio', moveName: 'Hail' },
-      {
-        type: 'parallel',
-        phases: [
-          { type: 'particles', image: './fx/shard.png', count: 10, origin: 'screen', spread: 300, duration: 800, gravity: 5, fadeOut: true, scale: [0.1, 0.4], rotation: true, velocity: { x: [-1, 1], y: [2, 5] } },
-          { type: 'color-grade', color: '#88ccff', opacity: 0.1, duration: 800 },
-          { type: 'screen-shake', intensity: 2, duration: 600, axis: 'y' },
-        ],
-      },
     ],
   },
 
@@ -374,6 +348,7 @@ export const statusMoves: MoveAnimationDef[] = [
           { type: 'lighting', color: '#ffee00', at: 'screen', radius: 300, intensity: 0.3, duration: 800 },
         ],
       },
+      { type: 'start-terrain', terrain: 'electric' },
       { type: 'audio', moveName: 'Electric Terrain' },
     ],
   },
@@ -393,6 +368,7 @@ export const statusMoves: MoveAnimationDef[] = [
           { type: 'lighting', color: '#44cc44', at: 'screen', radius: 300, intensity: 0.3, duration: 800 },
         ],
       },
+      { type: 'start-terrain', terrain: 'grassy' },
       { type: 'audio', moveName: 'Grassy Terrain' },
     ],
   },
@@ -411,6 +387,7 @@ export const statusMoves: MoveAnimationDef[] = [
           { type: 'lighting', color: '#ff66cc', at: 'screen', radius: 300, intensity: 0.3, duration: 800 },
         ],
       },
+      { type: 'start-terrain', terrain: 'psychic' },
       { type: 'audio', moveName: 'Psychic Terrain' },
     ],
   },
@@ -429,6 +406,7 @@ export const statusMoves: MoveAnimationDef[] = [
           { type: 'lighting', color: '#ff88cc', at: 'screen', radius: 300, intensity: 0.25, duration: 800 },
         ],
       },
+      { type: 'start-terrain', terrain: 'misty' },
       { type: 'audio', moveName: 'Misty Terrain' },
     ],
   },

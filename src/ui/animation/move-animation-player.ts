@@ -43,7 +43,12 @@ export class MoveAnimationPlayer {
   /** Stop functions for active persistent effects, keyed by type. */
   private activeWeatherEffect: { stop: () => void; render: RenderCallback } | null = null;
   private activeTerrainEffect: { stop: () => void; render: RenderCallback } | null = null;
+  /** Track current weather/terrain type for idempotent start calls. */
+  private currentWeatherType: string | null = null;
+  private currentTerrainType: string | null = null;
   private rafId: number | null = null;
+  /** Promise that resolves when the current move's audio finishes playing. */
+  private audioPromise: Promise<void> | null = null;
 
   /** Reference arena width used to design animation scale values. */
   private static readonly REF_WIDTH = 800;
@@ -71,6 +76,7 @@ export class MoveAnimationPlayer {
 
   /**
    * Play a full move animation sequence.
+   * Visual phase durations are scaled to match total audio duration.
    */
   async play(
     def: MoveAnimationDef,
@@ -78,13 +84,22 @@ export class MoveAnimationPlayer {
     targets: BattlePosition[],
   ): Promise<void> {
     this._playing = true;
+    this.audioPromise = null;
     const defender = targets[0] ?? attacker;
+
+    // Compute time scale so visual animation matches audio duration
+    const timeScale = await this.computeTimeScale(def);
 
     try {
       for (const phase of def.phases) {
-        await this.executePhase(phase, attacker, defender);
+        await this.executePhase(phase, attacker, defender, timeScale);
+      }
+      // Safety net: if visual phases still finished before audio, wait
+      if (this.audioPromise) {
+        await this.audioPromise;
       }
     } finally {
+      this.audioPromise = null;
       this._playing = false;
       this.stopRafLoop();
       // Only clear canvas if no persistent effects are running
@@ -92,6 +107,92 @@ export class MoveAnimationPlayer {
         this.canvas.clear();
       }
     }
+  }
+
+  // ── Time scale computation ──
+
+  /**
+   * Estimate the visual duration of a single phase (excluding audio).
+   */
+  private estimatePhaseDuration(phase: AnimationPhase): number {
+    switch (phase.type) {
+      case 'parallel':
+        return phase.phases.length > 0
+          ? Math.max(...phase.phases.map(p => this.estimatePhaseDuration(p)))
+          : 0;
+      case 'audio':
+      case 'start-weather':
+      case 'start-terrain':
+        return 0;
+      case 'pause':
+      case 'hit-stop':
+        return phase.duration;
+      case 'spritesheet':
+        return (phase.sheet.frameCount / (phase.sheet.fps ?? 12)) * 1000 * (phase.loops ?? 1);
+      case 'sprite-move':
+      case 'projectile':
+      case 'particles':
+      case 'screen-flash':
+      case 'screen-shake':
+      case 'camera-zoom':
+      case 'lighting':
+      case 'color-grade':
+      case 'afterimage':
+        return phase.duration;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Walk the phase tree, collecting audio entries with their start times
+   * in the visual timeline. Returns the total visual duration.
+   */
+  private walkPhasesForAudio(
+    phases: AnimationPhase[],
+    startTime: number,
+    entries: { startTime: number; moveName: string; part?: number }[],
+  ): number {
+    let clock = startTime;
+    for (const phase of phases) {
+      if (phase.type === 'parallel') {
+        let maxEnd = clock;
+        for (const child of phase.phases) {
+          const childEnd = this.walkPhasesForAudio([child], clock, entries);
+          maxEnd = Math.max(maxEnd, childEnd);
+        }
+        clock = maxEnd;
+      } else if (phase.type === 'audio') {
+        entries.push({ startTime: clock, moveName: phase.moveName, part: phase.part });
+        // Audio doesn't advance the visual clock
+      } else {
+        clock += this.estimatePhaseDuration(phase);
+      }
+    }
+    return clock;
+  }
+
+  /**
+   * Compute a time scale factor so visual phases stretch to fill the audio duration.
+   * Only slows down (never speeds up). Capped at 3x to avoid extreme stretching.
+   */
+  private async computeTimeScale(def: MoveAnimationDef): Promise<number> {
+    const entries: { startTime: number; moveName: string; part?: number }[] = [];
+    const totalVisualDuration = this.walkPhasesForAudio(def.phases, 0, entries);
+
+    if (entries.length === 0 || totalVisualDuration <= 0) return 1;
+
+    // Find when the last audio would end
+    let maxAudioEnd = 0;
+    for (const entry of entries) {
+      const path = audioManager.getMoveSfxPath(entry.moveName, entry.part);
+      const duration = await audioManager.getAudioDuration(path);
+      maxAudioEnd = Math.max(maxAudioEnd, entry.startTime + duration);
+    }
+
+    if (maxAudioEnd <= totalVisualDuration || maxAudioEnd <= 0) return 1;
+
+    return Math.min(3, maxAudioEnd / totalVisualDuration);
   }
 
   // ── Shared RAF loop ──
@@ -163,51 +264,58 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase,
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     switch (phase.type) {
       case 'parallel':
         await Promise.all(
-          phase.phases.map((p) => this.executePhase(p, attacker, defender)),
+          phase.phases.map((p) => this.executePhase(p, attacker, defender, timeScale)),
         );
         break;
       case 'pause':
-        await delay(phase.duration);
+        await delay(phase.duration * timeScale);
         break;
       case 'hit-stop':
-        await delay(phase.duration);
+        await delay(phase.duration * timeScale);
         break;
       case 'audio':
         this.playAudio(phase.moveName, phase.part);
         break;
       case 'sprite-move':
-        await this.executeSpriteMove(phase, attacker, defender);
+        await this.executeSpriteMove(phase, attacker, defender, timeScale);
         break;
       case 'spritesheet':
-        await this.executeSpritesheet(phase, attacker, defender);
+        await this.executeSpritesheet(phase, attacker, defender, timeScale);
         break;
       case 'projectile':
-        await this.executeProjectile(phase, attacker, defender);
+        await this.executeProjectile(phase, attacker, defender, timeScale);
         break;
       case 'particles':
-        await this.executeParticles(phase, attacker, defender);
+        await this.executeParticles(phase, attacker, defender, timeScale);
         break;
       case 'screen-flash':
-        await this.executeScreenFlash(phase);
+        await this.executeScreenFlash(phase, timeScale);
         break;
       case 'screen-shake':
-        await this.executeScreenShake(phase);
+        await this.executeScreenShake(phase, timeScale);
         break;
       case 'camera-zoom':
-        await this.executeCameraZoom(phase);
+        await this.executeCameraZoom(phase, timeScale);
         break;
       case 'lighting':
-        await this.executeLighting(phase, attacker, defender);
+        await this.executeLighting(phase, attacker, defender, timeScale);
         break;
       case 'color-grade':
-        await this.executeColorGrade(phase);
+        await this.executeColorGrade(phase, timeScale);
         break;
       case 'afterimage':
-        await this.executeAfterimage(phase, attacker, defender);
+        await this.executeAfterimage(phase, attacker, defender, timeScale);
+        break;
+      case 'start-weather':
+        await this.startWeather(phase.weather);
+        break;
+      case 'start-terrain':
+        await this.startTerrain(phase.terrain);
         break;
     }
   }
@@ -218,40 +326,42 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase & { type: 'sprite-move' },
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     const who = phase.target === 'attacker' ? attacker : defender;
     const other = phase.target === 'attacker' ? defender : attacker;
+    const dur = phase.duration * timeScale;
 
     switch (phase.motion) {
       case 'lunge':
-        await this.spriteAnimator.lunge(who, other, phase.duration, phase.easing);
+        await this.spriteAnimator.lunge(who, other, dur, phase.easing);
         break;
       case 'recoil':
-        await this.spriteAnimator.recoil(who, 8, phase.duration);
+        await this.spriteAnimator.recoil(who, 8, dur);
         break;
       case 'hop':
-        await this.spriteAnimator.hop(who, phase.duration);
+        await this.spriteAnimator.hop(who, dur);
         break;
       case 'shake':
-        await this.spriteAnimator.shake(who, 6, phase.duration);
+        await this.spriteAnimator.shake(who, 6, dur);
         break;
       case 'fly-up':
-        await this.spriteAnimator.flyUp(who, phase.duration);
+        await this.spriteAnimator.flyUp(who, dur);
         break;
       case 'fly-down':
-        await this.spriteAnimator.flyDown(who, phase.duration);
+        await this.spriteAnimator.flyDown(who, dur);
         break;
       case 'spin':
-        await this.spriteAnimator.spin(who, phase.duration);
+        await this.spriteAnimator.spin(who, dur);
         break;
       case 'flip':
-        await this.spriteAnimator.flip(who, phase.duration);
+        await this.spriteAnimator.flip(who, dur);
         break;
       case 'slide-out':
-        await this.spriteAnimator.slideOut(who, phase.duration);
+        await this.spriteAnimator.slideOut(who, dur);
         break;
       case 'slide-in':
-        await this.spriteAnimator.slideIn(who, phase.duration);
+        await this.spriteAnimator.slideIn(who, dur);
         break;
     }
   }
@@ -260,6 +370,7 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase & { type: 'spritesheet' },
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     const pos = this.posResolver.resolve(phase.at, attacker, defender);
     const img = await preloadImage(phase.sheet.src);
@@ -269,8 +380,13 @@ export class MoveAnimationPlayer {
       ? { x: phase.offset.x * s, y: phase.offset.y * s }
       : undefined;
 
+    // Slow down fps to stretch spritesheet duration by timeScale
+    const sheet = timeScale !== 1
+      ? { ...phase.sheet, fps: (phase.sheet.fps ?? 12) / timeScale }
+      : phase.sheet;
+
     const { render, promise } = createSpritesheetRenderer(
-      phase.sheet,
+      sheet,
       img,
       pos,
       {
@@ -292,6 +408,7 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase & { type: 'projectile' },
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     const from = this.posResolver.resolve(phase.from, attacker, defender);
     const to = this.posResolver.resolve(phase.to, attacker, defender);
@@ -301,7 +418,7 @@ export class MoveAnimationPlayer {
     const { render, promise } = createProjectileRenderer(img, {
       from,
       to,
-      duration: phase.duration,
+      duration: phase.duration * timeScale,
       scale: (phase.scale ?? 1) * s,
       tint: phase.tint,
       trail: phase.trail,
@@ -325,6 +442,7 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase & { type: 'particles' },
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     const origin = this.posResolver.resolve(phase.origin, attacker, defender);
     const img = await preloadImage(phase.image);
@@ -336,6 +454,7 @@ export class MoveAnimationPlayer {
 
     const { render, promise } = createParticleRenderer(img, {
       ...phase,
+      duration: phase.duration * timeScale,
       origin,
       spread: (phase.spread ?? 30) * s,
       scale: scaledScale,
@@ -352,13 +471,15 @@ export class MoveAnimationPlayer {
    */
   private async executeScreenFlash(
     phase: AnimationPhase & { type: 'screen-flash' },
+    timeScale: number = 1,
   ): Promise<void> {
     const w = this.canvas.width;
     const h = this.canvas.height;
     const maxOpacity = phase.opacity ?? 0.5;
     const startTime = performance.now();
-    const half = phase.duration / 2;
-    const total = phase.duration;
+    const dur = phase.duration * timeScale;
+    const half = dur / 2;
+    const total = dur;
 
     await this.addRenderer((ctx) => {
       const elapsed = performance.now() - startTime;
@@ -379,21 +500,23 @@ export class MoveAnimationPlayer {
 
   private async executeScreenShake(
     phase: AnimationPhase & { type: 'screen-shake' },
+    timeScale: number = 1,
   ): Promise<void> {
     const intensity = phase.intensity * this.arenaScale;
     const axis = phase.axis ?? 'both';
     const start = performance.now();
+    const dur = phase.duration * timeScale;
 
     return new Promise((resolve) => {
       const tick = (now: number): void => {
         const elapsed = now - start;
-        if (elapsed >= phase.duration) {
+        if (elapsed >= dur) {
           this.arena.style.transform = '';
           resolve();
           return;
         }
 
-        const decay = 1 - elapsed / phase.duration;
+        const decay = 1 - elapsed / dur;
         const dx = axis !== 'y' ? (Math.random() - 0.5) * intensity * 2 * decay : 0;
         const dy = axis !== 'x' ? (Math.random() - 0.5) * intensity * 2 * decay : 0;
         this.arena.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -407,9 +530,10 @@ export class MoveAnimationPlayer {
 
   private async executeCameraZoom(
     phase: AnimationPhase & { type: 'camera-zoom' },
+    timeScale: number = 1,
   ): Promise<void> {
     const easingFn = getEasing(phase.easing ?? 'easeOutElastic');
-    const half = phase.duration / 2;
+    const half = (phase.duration * timeScale) / 2;
 
     await tween(1, phase.scale, half * 0.3, getEasing('easeOutQuad'), (s) => {
       this.arena.style.transform = `scale(${s})`;
@@ -426,11 +550,13 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase & { type: 'lighting' },
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     const pos = this.posResolver.resolve(phase.at, attacker, defender);
     const startTime = performance.now();
-    const half = phase.duration / 2;
-    const total = phase.duration;
+    const dur = phase.duration * timeScale;
+    const half = dur / 2;
+    const total = dur;
     const scaledRadius = phase.radius * this.arenaScale;
 
     await this.addRenderer((ctx) => {
@@ -475,12 +601,14 @@ export class MoveAnimationPlayer {
 
   private async executeColorGrade(
     phase: AnimationPhase & { type: 'color-grade' },
+    timeScale: number = 1,
   ): Promise<void> {
     const w = this.canvas.width;
     const h = this.canvas.height;
     const startTime = performance.now();
-    const half = phase.duration / 2;
-    const total = phase.duration;
+    const dur = phase.duration * timeScale;
+    const half = dur / 2;
+    const total = dur;
 
     await this.addRenderer((ctx) => {
       const elapsed = performance.now() - startTime;
@@ -503,6 +631,7 @@ export class MoveAnimationPlayer {
     phase: AnimationPhase & { type: 'afterimage' },
     attacker: BattlePosition,
     defender: BattlePosition,
+    timeScale: number = 1,
   ): Promise<void> {
     const who = phase.target === 'attacker' ? attacker : defender;
     const imgSrc = this.spriteAnimator.getSpriteImageSrc(who);
@@ -513,12 +642,13 @@ export class MoveAnimationPlayer {
     const s = this.arenaScale;
     const spacing = 15 * s;
     const startTime = performance.now();
+    const dur = phase.duration * timeScale;
 
     await this.addRenderer((ctx) => {
       const elapsed = performance.now() - startTime;
-      if (elapsed >= phase.duration) return false;
+      if (elapsed >= dur) return false;
 
-      const progress = elapsed / phase.duration;
+      const progress = elapsed / dur;
       const alpha = 1 - progress;
 
       for (let i = 0; i < phase.count; i++) {
@@ -547,6 +677,9 @@ export class MoveAnimationPlayer {
    * Replaces any currently active weather effect.
    */
   async startWeather(weather: string): Promise<void> {
+    // Skip if the same weather is already active (idempotent)
+    if (this.currentWeatherType === weather && this.activeWeatherEffect) return;
+
     // Stop existing weather effect
     this.stopWeather();
 
@@ -558,6 +691,7 @@ export class MoveAnimationPlayer {
 
     await effect.loadPromise;
 
+    this.currentWeatherType = weather;
     this.activeWeatherEffect = { stop: effect.stop, render: effect.render };
     this.persistentRenderers.add(effect.render);
     this.ensureRafRunning();
@@ -572,6 +706,7 @@ export class MoveAnimationPlayer {
       // The renderer will remove itself when fadeAlpha reaches 0
       this.activeWeatherEffect = null;
     }
+    this.currentWeatherType = null;
   }
 
   /**
@@ -579,6 +714,9 @@ export class MoveAnimationPlayer {
    * Replaces any currently active terrain effect.
    */
   async startTerrain(terrain: string): Promise<void> {
+    // Skip if the same terrain is already active (idempotent)
+    if (this.currentTerrainType === terrain && this.activeTerrainEffect) return;
+
     // Stop existing terrain effect
     this.stopTerrain();
 
@@ -590,6 +728,7 @@ export class MoveAnimationPlayer {
 
     await effect.loadPromise;
 
+    this.currentTerrainType = terrain;
     this.activeTerrainEffect = { stop: effect.stop, render: effect.render };
     this.persistentRenderers.add(effect.render);
     this.ensureRafRunning();
@@ -603,6 +742,7 @@ export class MoveAnimationPlayer {
       this.activeTerrainEffect.stop();
       this.activeTerrainEffect = null;
     }
+    this.currentTerrainType = null;
   }
 
   // ── Pokeball animations (switch-in / switch-out) ──
@@ -747,9 +887,9 @@ export class MoveAnimationPlayer {
 
   private playAudio(moveName: string, part?: number): void {
     if (part !== undefined) {
-      audioManager.playMoveSfxPart(moveName, part);
+      this.audioPromise = audioManager.playMoveSfxPartFullDuration(moveName, part);
     } else {
-      audioManager.playMoveSfx(moveName);
+      this.audioPromise = audioManager.playMoveSfxFullDuration(moveName);
     }
   }
 }

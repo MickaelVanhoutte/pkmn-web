@@ -12,14 +12,19 @@ interface PointLight {
 
 /**
  * Day/night overlay with light holes.
- * Uses a RenderTexture filled with ambient color, then erases circles for light sources.
+ * Uses a RenderTexture filled with ambient color, then erases ellipses for light sources.
  */
 export class LightingManager {
   private rt: Phaser.GameObjects.RenderTexture;
   private lightBrush: Phaser.GameObjects.Graphics;
   private lights: PointLight[] = [];
-  private playerLight: PointLight;
   private elapsed = 0;
+
+  /** Player light screen position (set externally from the sprite) */
+  private playerScreenX = 0;
+  private playerScreenY = 0;
+  private playerRadius = 30;
+  private playerIntensity = 0.95;
 
   constructor(
     private scene: Phaser.Scene,
@@ -37,24 +42,16 @@ export class LightingManager {
     // Offscreen graphics used as a brush for erasing light holes
     this.lightBrush = scene.add.graphics();
     this.lightBrush.setVisible(false);
-
-    // Player glow
-    this.playerLight = {
-      worldX: 0,
-      worldY: 0,
-      radius: 60,
-      color: 0xffeedd,
-      intensity: 0.9,
-    };
   }
 
   addLight(light: PointLight): void {
     this.lights.push(light);
   }
 
-  setPlayerPosition(x: number, y: number): void {
-    this.playerLight.worldX = x;
-    this.playerLight.worldY = y;
+  /** Set the player light position in screen/viewport coords (from sprite). */
+  setPlayerScreenPos(screenX: number, screenY: number): void {
+    this.playerScreenX = screenX;
+    this.playerScreenY = screenY;
   }
 
   update(dt: number): void {
@@ -83,32 +80,43 @@ export class LightingManager {
     this.rt.clear();
     this.rt.fill(tint, alpha);
 
-    // Punch light holes
-    const allLights = [...this.lights, this.playerLight];
-    for (const light of allLights) {
+    // Punch light holes for static/world lights
+    for (const light of this.lights) {
       let intensity = light.intensity;
       if (light.flicker) {
         intensity *= 0.85 + 0.15 * Math.sin(this.elapsed * 5 + light.worldX);
       }
 
-      // World → screen coords (use worldView, not scrollX)
-      const screenX = (light.worldX - cam.worldView.x) * cam.zoom;
-      const screenY = (light.worldY - cam.worldView.y) * cam.zoom;
+      // Match Phaser's camera transform: (world - scroll) * zoom - halfView * (zoom - 1)
+      const screenX = (light.worldX - cam.scrollX) * cam.zoom - w * 0.5 * (cam.zoom - 1);
+      const screenY = (light.worldY - cam.scrollY) * cam.zoom - h * 0.5 * (cam.zoom - 1);
       const screenRadius = light.radius * cam.zoom;
 
-      // Draw concentric circles for soft falloff
-      this.lightBrush.clear();
-      const steps = 8;
-      for (let i = steps; i >= 0; i--) {
-        const f = i / steps;
-        const rad = screenRadius * f;
-        const a = intensity * (1 - f * f); // quadratic falloff
-        this.lightBrush.fillStyle(0xffffff, a);
-        this.lightBrush.fillCircle(screenX, screenY, rad);
-      }
-
-      this.rt.erase(this.lightBrush, 0, 0);
+      this.drawLightEllipse(screenX, screenY, screenRadius, intensity);
     }
+
+    // Punch player light (using pre-computed screen coords — always centered)
+    const playerScreenRadius = this.playerRadius * cam.zoom;
+    this.drawLightEllipse(
+      this.playerScreenX,
+      this.playerScreenY,
+      playerScreenRadius,
+      this.playerIntensity,
+    );
+  }
+
+  private drawLightEllipse(sx: number, sy: number, radius: number, intensity: number): void {
+    this.lightBrush.clear();
+    const steps = 8;
+    for (let i = steps; i >= 0; i--) {
+      const f = i / steps;
+      const radX = radius * f;
+      const radY = radius * f * 0.5; // 2:1 iso ratio
+      const a = intensity * (1 - f * f); // quadratic falloff
+      this.lightBrush.fillStyle(0xffffff, a);
+      this.lightBrush.fillEllipse(sx, sy, radX * 2, radY * 2);
+    }
+    this.rt.erase(this.lightBrush, 0, 0);
   }
 
   destroy(): void {

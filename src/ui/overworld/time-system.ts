@@ -9,12 +9,37 @@ export class TimeSystem {
   /** Game hours per real second */
   private speed = 1 / 60; // 1 hour per 60 real seconds
 
+  /** When true, time progression is paused (debug scrubbing) */
+  private paused = false;
+
   update(dt: number): void {
+    if (this.paused) return;
     this.timeNorm = (this.timeNorm + (this.speed * dt) / 24) % 1;
   }
 
   getTimeNorm(): number {
     return this.timeNorm;
+  }
+
+  /** Set normalized time directly (0–1). Used by debug controls. */
+  setTimeNorm(t: number): void {
+    this.timeNorm = ((t % 1) + 1) % 1;
+  }
+
+  setSpeed(hoursPerSecond: number): void {
+    this.speed = hoursPerSecond;
+  }
+
+  getSpeed(): number {
+    return this.speed;
+  }
+
+  setPaused(p: boolean): void {
+    this.paused = p;
+  }
+
+  isPaused(): boolean {
+    return this.paused;
   }
 
   /** Returns true during night hours (roughly 8pm-5am) */
@@ -23,14 +48,15 @@ export class TimeSystem {
   }
 
   /**
-   * Get the ambient overlay alpha (0 = full brightness, 0.7 = deep night).
+   * Get the ambient overlay alpha (0 = full brightness, 0.85 = deep night).
    */
   getAmbientAlpha(): number {
     const t = this.timeNorm;
+    const NIGHT_ALPHA = 0.85;
 
     // Dawn: 0.20–0.30 (gradually brighten)
     if (t >= 0.20 && t < 0.30) {
-      return 0.7 * (1 - (t - 0.20) / 0.10);
+      return NIGHT_ALPHA * (1 - (t - 0.20) / 0.10);
     }
     // Day: 0.30–0.70 (full brightness)
     if (t >= 0.30 && t < 0.70) {
@@ -38,10 +64,10 @@ export class TimeSystem {
     }
     // Dusk: 0.70–0.83 (gradually darken)
     if (t >= 0.70 && t < 0.83) {
-      return 0.7 * ((t - 0.70) / 0.13);
+      return NIGHT_ALPHA * ((t - 0.70) / 0.13);
     }
     // Night: 0.83–1.00 and 0.00–0.20
-    return 0.7;
+    return NIGHT_ALPHA;
   }
 
   /**
@@ -53,12 +79,12 @@ export class TimeSystem {
     // Dawn: warm orange
     if (t >= 0.20 && t < 0.30) {
       const f = (t - 0.20) / 0.10;
-      return lerpColor(0x1a1a4a, 0xd4885a, f);
+      return lerpColor(0x0a0a30, 0xe08040, f);
     }
     // Morning transition: orange → neutral
     if (t >= 0.30 && t < 0.38) {
       const f = (t - 0.30) / 0.08;
-      return lerpColor(0xd4885a, 0x888888, f);
+      return lerpColor(0xe08040, 0x888888, f);
     }
     // Day: neutral
     if (t >= 0.38 && t < 0.65) {
@@ -67,15 +93,15 @@ export class TimeSystem {
     // Dusk approach: neutral → pink/orange
     if (t >= 0.65 && t < 0.75) {
       const f = (t - 0.65) / 0.10;
-      return lerpColor(0x888888, 0xc46848, f);
+      return lerpColor(0x888888, 0xd05030, f);
     }
     // Dusk → night: pink/orange → dark blue
     if (t >= 0.75 && t < 0.83) {
       const f = (t - 0.75) / 0.08;
-      return lerpColor(0xc46848, 0x1a1a4a, f);
+      return lerpColor(0xd05030, 0x0a0a30, f);
     }
-    // Night: dark blue
-    return 0x1a1a4a;
+    // Night: deep dark blue
+    return 0x0a0a30;
   }
 }
 

@@ -32,6 +32,8 @@ import { TimeSystem } from './time-system';
 import { LightingManager } from './lighting';
 import { VignettePipeline } from './effects/VignettePipeline';
 import { WaterPipeline } from './effects/WaterPipeline';
+import { IS_DEBUG } from '../util/debug';
+import type { DebugTimeControllerComponent } from '../components/debug-time-controller';
 
 const DIR_DELTAS: Record<Direction, { dc: number; dr: number }> = {
   up: { dc: 0, dr: -1 },
@@ -129,6 +131,8 @@ export class OverworldScene extends Phaser.Scene {
   private lastCheckedCol = -1;
   private lastCheckedRow = -1;
 
+  private debugTimeCtrl: DebugTimeControllerComponent | null = null;
+
   constructor() {
     super({ key: 'OverworldScene' });
   }
@@ -199,6 +203,22 @@ export class OverworldScene extends Phaser.Scene {
     if (import.meta.env.DEV) {
       (window as any).__scene = this;
     }
+
+    // Debug day/night controller
+    if (IS_DEBUG) {
+      import('../components/debug-time-controller').then(({ createDebugTimeController }) => {
+        this.debugTimeCtrl = createDebugTimeController(this.timeSystem);
+        document.body.appendChild(this.debugTimeCtrl.el);
+      });
+    }
+
+    // Clean up debug DOM element when leaving the scene
+    const cleanupDebug = () => {
+      this.debugTimeCtrl?.el.remove();
+      this.debugTimeCtrl = null;
+    };
+    this.events.on('shutdown', cleanupDebug);
+    this.events.on('destroy', cleanupDebug);
   }
 
   update(_time: number, delta: number): void {
@@ -228,9 +248,13 @@ export class OverworldScene extends Phaser.Scene {
     this.particles.setNight(this.timeSystem.isNight());
     this.particles.update();
 
-    const pos = getPlayerScreenPos(this.player, this.map);
-    this.lighting.setPlayerPosition(pos.x, pos.y);
+    // Player light: always at viewport center.
+    // The camera follows the player, so the player is always near center.
+    const cam = this.cameras.main;
+    this.lighting.setPlayerScreenPos(Math.round(cam.width * 0.5), Math.round(cam.height * 0.5));
     this.lighting.update(dt);
+
+    this.debugTimeCtrl?.update();
   }
 
   // ── Character Animations ─────────────────────────────────────

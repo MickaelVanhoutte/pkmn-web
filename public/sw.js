@@ -1,4 +1,5 @@
-const CACHE_NAME = 'pkmn-battle-v1';
+// __BUILD_TIMESTAMP__ is replaced at build time by vite
+const CACHE_NAME = 'pkmn-battle-__BUILD_TIMESTAMP__';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -19,10 +20,13 @@ self.addEventListener('activate', (event) => {
 
 // Network-first: always try network, cache response for offline fallback
 self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response && response.status === 200) {
+        if (response && response.status === 200 && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }

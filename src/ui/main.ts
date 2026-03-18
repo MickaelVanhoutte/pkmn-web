@@ -51,7 +51,18 @@ const navigate: NavigateFn = (screen, params) => {
 
 navigate('title');
 
-// Register service worker for PWA
+// Register service worker for PWA — auto-reload on new version
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js').catch(() => {});
+  navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js').then((reg) => {
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      if (!newSW) return;
+      newSW.addEventListener('statechange', () => {
+        // New SW activated and there was a previous one — reload to get fresh assets
+        if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
+      });
+    });
+  }).catch(() => {});
 }

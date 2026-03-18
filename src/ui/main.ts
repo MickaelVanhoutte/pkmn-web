@@ -2,13 +2,15 @@ import './styles/global.css';
 import './styles/battle.css';
 import './styles/panels.css';
 import './styles/team-select.css';
+import './styles/overworld.css';
 
 import { showTitleScreen } from './screens/title-screen';
 import { showTeamSelect } from './screens/team-select';
 import { showBattleScreen } from './screens/battle-screen';
 import { showResultScreen } from './screens/result-screen';
+import { showOverworldScreen } from './screens/overworld-screen';
 
-export type Screen = 'title' | 'team-select' | 'battle' | 'result';
+export type Screen = 'title' | 'team-select' | 'battle' | 'result' | 'overworld';
 export type NavigateFn = (screen: Screen, params?: Record<string, unknown>) => void;
 
 const app = document.getElementById('app')!;
@@ -40,6 +42,9 @@ const navigate: NavigateFn = (screen, params) => {
         winner: params?.winner as 0 | 1 | null,
         config: params?.config as import('../types/battle').BattleConfig,
       });
+      break;
+    case 'overworld':
+      cleanupFn = showOverworldScreen(app, navigate);
       break;
   }
 }

@@ -46,6 +46,12 @@ export function showTitleScreen(
     navigate('team-select', { format: selectedFormat });
   });
 
+  // Explore button
+  const exploreBtn = el('button', { class: 'title-start-btn' }, ['EXPLORE']);
+  exploreBtn.addEventListener('click', () => {
+    navigate('overworld');
+  });
+
   // Credits
   const credits = el('div', { class: 'title-credits' }, ['Built with TypeScript']);
 
@@ -54,6 +60,7 @@ export function showTitleScreen(
     titleBlock,
     formatRow,
     startBtn,
+    exploreBtn,
     credits,
   ]);
 

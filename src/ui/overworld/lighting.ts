@@ -79,7 +79,8 @@ export class LightingManager {
     }
     this.rt.setVisible(true);
 
-    // Fill with ambient color
+    // Clear previous frame and fill with ambient color
+    this.rt.clear();
     this.rt.fill(tint, alpha);
 
     // Punch light holes

@@ -13,7 +13,7 @@ export const TILE_HALF_H = 7; // vertical step between rows (diamond half-height
 export const TILE_ORIGIN_Y = 15;
 
 /** Scale factor for rendering (2 = tiles render at 64×64 on screen) */
-export const RENDER_SCALE = 2;
+export const RENDER_SCALE = 3;
 
 /**
  * Convert grid (col, row) to screen pixel position.

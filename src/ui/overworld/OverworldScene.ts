@@ -26,20 +26,13 @@ import { ParticleManager } from './particles';
 import { TimeSystem } from './time-system';
 import { LightingManager } from './lighting';
 import { VignettePipeline } from './effects/VignettePipeline';
+import { WaterPipeline } from './effects/WaterPipeline';
 
 const DIR_DELTAS: Record<Direction, { dc: number; dr: number }> = {
   up: { dc: 0, dr: -1 },
   down: { dc: 0, dr: 1 },
   left: { dc: -1, dr: 0 },
   right: { dc: 1, dr: 0 },
-};
-
-/** Water tiles that alternate for animation */
-const WATER_ANIM: Record<string, string> = {
-  'tile_090': 'tile_095',
-  'tile_095': 'tile_090',
-  'tile_105': 'tile_110',
-  'tile_110': 'tile_105',
 };
 
 /** Cliff face colors per tile type */
@@ -97,10 +90,6 @@ export class OverworldScene extends Phaser.Scene {
   private cameraTarget!: Phaser.GameObjects.Zone;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
 
-  private waterSprites: { sprite: Phaser.GameObjects.Sprite; originalKey: string }[] = [];
-  private animTime = 0;
-  private waterFrame = false;
-
   private queuedDirection: Direction | null = null;
 
   private particles!: ParticleManager;
@@ -132,10 +121,12 @@ export class OverworldScene extends Phaser.Scene {
     this.map = TEST_MAP;
     this.tileMetaMap = getTileMetaMap();
     this.player = createPlayer(this.map.playerStart.col, this.map.playerStart.row);
-    this.waterSprites = [];
-    this.animTime = 0;
-    this.waterFrame = false;
     this.queuedDirection = null;
+
+    // Register water pipeline before building the map
+    if (this.renderer.type === Phaser.WEBGL) {
+      (this.renderer as Phaser.Renderer.WebGL.WebGLRenderer).pipelines.add('WaterPipeline', new WaterPipeline(this.game));
+    }
 
     this.createCharacterAnimations();
     this.buildMap();
@@ -168,12 +159,10 @@ export class OverworldScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     const dt = delta / 1000;
-    this.animTime += dt;
 
     this.handleMovementInput();
     updatePlayer(this.player, dt);
     this.updatePlayerSprite();
-    this.updateWaterAnimation();
     this.emitFootstepDust();
 
     // Atmospheric systems
@@ -239,9 +228,9 @@ export class OverworldScene extends Phaser.Scene {
           sprite.setOrigin(TILE_HALF_W / TILE_W, TILE_ORIGIN_Y / TILE_IMG_H);
           sprite.setDepth(row * 1000 + col * 10 + 1);
 
-          // Track water sprites for animation
-          if (WATER_ANIM[tileId]) {
-            this.waterSprites.push({ sprite, originalKey: tileId });
+          // Apply water shader
+          if (tileId === 'tile_114') {
+            sprite.setPipeline('WaterPipeline');
           }
         }
 
@@ -447,22 +436,6 @@ export class OverworldScene extends Phaser.Scene {
       case 'ArrowLeft': return 'left';
       case 'ArrowRight': return 'right';
       default: return null;
-    }
-  }
-
-  // ── Water Animation ───────────────────────────────────────────
-
-  private updateWaterAnimation(): void {
-    const newFrame = Math.floor(this.animTime / 0.6) % 2 === 1;
-    if (newFrame !== this.waterFrame) {
-      this.waterFrame = newFrame;
-      for (const { sprite, originalKey } of this.waterSprites) {
-        if (newFrame) {
-          sprite.setTexture(WATER_ANIM[originalKey]);
-        } else {
-          sprite.setTexture(originalKey);
-        }
-      }
     }
   }
 

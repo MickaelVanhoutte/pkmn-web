@@ -64,10 +64,7 @@ const P2 = 'tile_026'; // dirt-grass transition
 const FL = 'tile_020'; // flowered earth
 
 // Water (non-walkable base)
-const W1 = 'tile_090'; // deep water
-const W2 = 'tile_095'; // deep water (anim pair)
-const W3 = 'tile_105'; // shallow water
-const W4 = 'tile_110'; // light water
+const W = 'tile_114'; // water
 
 // Decorations
 const BUSH = 'tile_030'; // bush (sways)
@@ -123,13 +120,13 @@ export const TEST_MAP: MapData = {
     // Row 10
     [c(G1), c(G2), c(G1), c(G3), c(G1), c(G2), c(G1), c(S2), c(G1), c(G2), c(P2), c(D1), c(D2), c(G2), c(G1), c(G3)],
     // Row 11
-    [c(G2), c(G1), c(G3), c(G1), c(G2), c(G1,FLW2), c(G3), c(S1), c(G2), c(D1), c(D2), c(W3), c(W4), c(D1), c(G3), c(G1)],
+    [c(G2), c(G1), c(G3), c(G1), c(G2), c(G1,FLW2), c(G3), c(S1), c(G2), c(D1), c(D2), c(W), c(W), c(D1), c(G3), c(G1)],
     // Row 12
-    [c(G1), c(G3), c(G1,LOG), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(D2), c(W3), c(W1), c(W2), c(W3), c(D2), c(G2)],
+    [c(G1), c(G3), c(G1,LOG), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(D2), c(W), c(W), c(W), c(W), c(D2), c(G2)],
     // Row 13
-    [c(G3), c(G1,TREE), c(G2), c(G1), c(G2), c(G3), c(G1), c(G2), c(G1), c(D1), c(W4), c(W2), c(W1), c(W4), c(D1), c(G1)],
+    [c(G3), c(G1,TREE), c(G2), c(G1), c(G2), c(G3), c(G1), c(G2), c(G1), c(D1), c(W), c(W), c(W), c(W), c(D1), c(G1)],
     // Row 14
-    [c(G1), c(G2), c(G1), c(G3), c(G1,RCK2), c(G1), c(G2), c(G1), c(G3), c(G2), c(D2), c(W3), c(W3), c(D2), c(G2), c(G3)],
+    [c(G1), c(G2), c(G1), c(G3), c(G1,RCK2), c(G1), c(G2), c(G1), c(G3), c(G2), c(D2), c(W), c(W), c(D2), c(G2), c(G3)],
     // Row 15 (bottom)
     [c(G2), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(D1), c(D2), c(G1), c(G1), c(G1)],
   ],

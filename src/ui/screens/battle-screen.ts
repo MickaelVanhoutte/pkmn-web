@@ -28,7 +28,7 @@ const BACKGROUNDS = [
 export function showBattleScreen(
   container: HTMLElement,
   navigate: NavigateFn,
-  params: { config: BattleConfig },
+  params: { config: BattleConfig; playerPosition?: { col: number; row: number } },
 ): () => void {
   const { config } = params;
   const isDoubles = config.format === 'doubles';
@@ -125,7 +125,11 @@ export function showBattleScreen(
     onBattleEnd: (winner: PlayerIndex | null) => {
       setTimeout(() => {
         if (disposed) return;
-        navigate('result', { winner, config });
+        if (config.isWildBattle && params.playerPosition) {
+          navigate('overworld', { playerPosition: params.playerPosition });
+        } else {
+          navigate('result', { winner, config });
+        }
       }, 2000);
     },
   };

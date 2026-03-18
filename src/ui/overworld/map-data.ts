@@ -13,6 +13,12 @@ export interface MapData {
   playerStart: { col: number; row: number };
 }
 
+/** Bush/vegetation decoration tiles that act as walkable tall grass (encounter zones) */
+export const TALL_GRASS_TILES = new Set([
+  'tile_029', 'tile_030', 'tile_031', 'tile_032', 'tile_033',
+  'tile_034', 'tile_035', 'tile_036',
+]);
+
 export function isWalkable(
   map: MapData,
   col: number,
@@ -23,13 +29,20 @@ export function isWalkable(
   const cell = map.tiles[row][col];
   const baseDef = tiles.get(cell.base);
   if (!baseDef || !baseDef.walkable) return false;
-  if (cell.decoration) return false;
+  // Tall grass decorations are walkable; other decorations block
+  if (cell.decoration && !TALL_GRASS_TILES.has(cell.decoration)) return false;
   return true;
 }
 
 export function getTileHeight(map: MapData, col: number, row: number): number {
   if (col < 0 || row < 0 || col >= map.width || row >= map.height) return 0;
   return map.tiles[row][col].height ?? 0;
+}
+
+export function isEncounterTile(map: MapData, col: number, row: number): boolean {
+  if (col < 0 || row < 0 || col >= map.width || row >= map.height) return false;
+  const dec = map.tiles[row][col].decoration;
+  return dec != null && TALL_GRASS_TILES.has(dec);
 }
 
 export function canMoveTo(
@@ -97,18 +110,18 @@ export const TEST_MAP: MapData = {
   height: 16,
   playerStart: { col: 7, row: 7 },
   tiles: [
-    // Row 0 (top)
-    [c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1,TREE), c(G2), c(G1), c(G3), c(G1), c(G2)],
+    // Row 0 (top) — tall grass patch in upper-left
+    [c(G1,BUSH), c(G3,BSH2), c(G1,BUSH), c(G2,BSH2), c(G1,BUSH), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1,TREE), c(G2), c(G1), c(G3), c(G1), c(G2)],
     // Row 1
-    [c(G3), c(G1), c(G1,BUSH), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1), c(G2), ch(E1,1), ch(E2,1), c(G1), c(G2), c(G1)],
+    [c(G3,BSH2), c(G1,BUSH), c(G1,BSH2), c(G1,BUSH), c(G3,BSH2), c(G1), c(G2), c(G1), c(G3), c(G1), c(G2), ch(E1,1), ch(E2,1), c(G1), c(G2), c(G1)],
     // Row 2
-    [c(G1), c(G2), c(G1), c(G3), c(G1), c(G2), c(G1), c(S1), c(G2), c(G1), ch(E2,1), ch(S1,2), ch(S2,2), ch(E1,1), c(G3), c(G1)],
+    [c(G1,BUSH), c(G2,BSH2), c(G1,BUSH), c(G3,BSH2), c(G1,BUSH), c(G2), c(G1), c(S1), c(G2), c(G1), ch(E2,1), ch(S1,2), ch(S2,2), ch(E1,1), c(G3), c(G1)],
     // Row 3
-    [c(G2), c(G1), c(G3), c(G1,FLOW), c(G2), c(G1), c(G3), c(S2), c(G1), ch(E1,1), ch(S2,2), ch(S1,3), ch(S2,2), ch(E2,1), c(G1), c(G2)],
+    [c(G2,BSH2), c(G1,BUSH), c(G3,BSH2), c(G1,FLOW), c(G2,BUSH), c(G1), c(G3), c(S2), c(G1), ch(E1,1), ch(S2,2), ch(S1,3), ch(S2,2), ch(E2,1), c(G1), c(G2)],
     // Row 4
-    [c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1), c(S1), c(G3), ch(E2,1), ch(S1,2), ch(S2,2), ch(S1,2), ch(E1,1), c(G2), c(G1)],
+    [c(G1,BUSH), c(G3,BSH2), c(G1,BUSH), c(G2,BSH2), c(G1,BUSH), c(G3), c(G1), c(S1), c(G3), ch(E2,1), ch(S1,2), ch(S2,2), ch(S1,2), ch(E1,1), c(G2), c(G1)],
     // Row 5
-    [c(G3), c(G1), c(G2), c(G1), c(G3), c(G1,BSH2), c(G2), c(S2), c(G1), c(G2), ch(E1,1), ch(E2,1), ch(E1,1), c(G3), c(G1), c(G3)],
+    [c(G3,BSH2), c(G1,BUSH), c(G2,BSH2), c(G1), c(G3), c(G1,BSH2), c(G2), c(S2), c(G1), c(G2), ch(E1,1), ch(E2,1), ch(E1,1), c(G3), c(G1), c(G3)],
     // Row 6
     [c(G1), c(G1,TREE), c(G1), c(G3), c(G1), c(G2), c(G1), c(S1), c(G2), c(G1), c(G3), c(G1), c(G2), c(G1), c(G3), c(G1)],
     // Row 7 (player start — path runs horizontally)

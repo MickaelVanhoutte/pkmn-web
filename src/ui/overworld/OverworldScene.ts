@@ -9,8 +9,11 @@ import {
   TILE_ORIGIN_Y,
   RENDER_SCALE,
 } from './iso-math';
-import { TEST_MAP, isWalkable, getTileHeight } from './map-data';
+import { TEST_MAP, isWalkable, isEncounterTile, getTileHeight, TALL_GRASS_TILES } from './map-data';
 import type { MapData } from './map-data';
+import { generateWildPokemon, buildWildBattleConfig } from './wild-encounter';
+import type { PokemonConfig } from '@/types/pokemon';
+import type { NavigateFn } from '../main';
 import {
   createPlayer,
   updatePlayer,
@@ -80,6 +83,20 @@ const ISO_DIR_COL: Record<Direction, number> = {
 const IDLE_ROW = CHAR_ROW_OFFSET + 2;    // row 10 (both feet on ground)
 const WALK_ROWS = [CHAR_ROW_OFFSET + 1, CHAR_ROW_OFFSET + 2, CHAR_ROW_OFFSET + 3]; // rows 9,10,11
 
+/** Wild Pokemon spawn config */
+const SPAWN_INTERVAL_MS = 30_000;  // try to spawn every 30s
+const SPAWN_LIFETIME_MS = 60_000;  // despawn after 1 minute
+const MAX_SPAWNS = 3;
+const SPAWN_TINT = 0xaaffaa;       // brighter tint for active spawn bush
+
+interface WildSpawn {
+  col: number;
+  row: number;
+  pokemon: PokemonConfig;
+  shakeTimer: Phaser.Time.TimerEvent; // periodic shake bursts
+  despawnTimer: Phaser.Time.TimerEvent;
+}
+
 export class OverworldScene extends Phaser.Scene {
   private map!: MapData;
   private player!: PlayerState;
@@ -96,7 +113,19 @@ export class OverworldScene extends Phaser.Scene {
   private timeSystem!: TimeSystem;
   private lighting!: LightingManager;
   private footstepEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private leafEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private wasMoving = false;
+
+  // Navigation (injected via game registry)
+  private navigate!: NavigateFn;
+
+  // Wild encounter spawn system
+  private decorationSprites!: (Phaser.GameObjects.Sprite | null)[][];
+  private spawns: WildSpawn[] = [];
+  private encounterTiles: Array<{ col: number; row: number }> = [];
+  private encounterPending = false;
+  private lastCheckedCol = -1;
+  private lastCheckedRow = -1;
 
   constructor() {
     super({ key: 'OverworldScene' });
@@ -118,9 +147,18 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Retrieve navigate function and optional saved position from game registry
+    this.navigate = this.game.registry.get('navigate') as NavigateFn;
+    const savedPos = this.game.registry.get('playerPosition') as { col: number; row: number } | undefined;
+
     this.map = TEST_MAP;
     this.tileMetaMap = getTileMetaMap();
-    this.player = createPlayer(this.map.playerStart.col, this.map.playerStart.row);
+
+    const startCol = savedPos?.col ?? this.map.playerStart.col;
+    const startRow = savedPos?.row ?? this.map.playerStart.row;
+    this.player = createPlayer(startCol, startRow);
+    this.lastCheckedCol = startCol;
+    this.lastCheckedRow = startRow;
     this.queuedDirection = null;
 
     // Register water pipeline before building the map
@@ -142,6 +180,10 @@ export class OverworldScene extends Phaser.Scene {
 
     // Footstep dust emitter
     this.createFootstepEmitter();
+    this.createLeafEmitter();
+
+    // Wild encounter spawn system
+    this.initSpawnSystem();
 
     // Apply vignette to camera
     if (this.renderer.type === Phaser.WEBGL) {
@@ -158,10 +200,24 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
+    if (this.encounterPending) return;
+
     const dt = delta / 1000;
 
     this.handleMovementInput();
     updatePlayer(this.player, dt);
+
+    // Check for wild encounter + grass rustle when arriving at a new tile
+    if (
+      this.player.moveProgress >= 1 &&
+      (this.player.col !== this.lastCheckedCol || this.player.row !== this.lastCheckedRow)
+    ) {
+      this.lastCheckedCol = this.player.col;
+      this.lastCheckedRow = this.player.row;
+      this.rustleGrass(this.player.col, this.player.row);
+      this.checkSpawnEncounter(this.player.col, this.player.row);
+    }
+
     this.updatePlayerSprite();
     this.emitFootstepDust();
 
@@ -209,6 +265,12 @@ export class OverworldScene extends Phaser.Scene {
   private buildMap(): void {
     const { map } = this;
 
+    // Initialize decoration sprite grid for spawn visual effects
+    this.decorationSprites = Array.from({ length: map.height }, () =>
+      Array.from<Phaser.GameObjects.Sprite | null>({ length: map.width }).fill(null),
+    );
+    this.encounterTiles = [];
+
     for (let row = 0; row < map.height; row++) {
       for (let col = 0; col < map.width; col++) {
         const cell = map.tiles[row][col];
@@ -243,8 +305,9 @@ export class OverworldScene extends Phaser.Scene {
           // Decorations render after all entities on their row
           decSprite.setDepth((row + 1) * 1000 - 10 + col * 0.1);
 
-          // Subtle sway animation for bushes only (not rocks)
-          if (SWAY_TILES.has(cell.decoration)) {
+          // Constant sway only for non-tall-grass sway tiles (trees)
+          // Tall grass bushes stay still until the player walks through them
+          if (SWAY_TILES.has(cell.decoration) && !TALL_GRASS_TILES.has(cell.decoration)) {
             const phase = (row * 7 + col * 13) % 100;
             this.tweens.add({
               targets: decSprite,
@@ -255,6 +318,12 @@ export class OverworldScene extends Phaser.Scene {
               repeat: -1,
               delay: phase * 30,
             });
+          }
+
+          // Track tall grass decorations for the spawn system
+          if (TALL_GRASS_TILES.has(cell.decoration)) {
+            this.decorationSprites[row][col] = decSprite;
+            this.encounterTiles.push({ col, row });
           }
         }
       }
@@ -475,5 +544,185 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     this.wasMoving = isMoving;
+  }
+
+  // ── Leaf Particles & Grass Rustle ──────────────────────────────
+
+  private createLeafEmitter(): void {
+    if (!this.textures.exists('particle-leaf')) {
+      const g = this.add.graphics();
+      g.fillStyle(0x4aaa3a, 1);
+      g.fillRect(0, 0, 3, 2);
+      g.generateTexture('particle-leaf', 3, 2);
+      g.destroy();
+    }
+
+    this.leafEmitter = this.add.particles(0, 0, 'particle-leaf', {
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 8, max: 20 },
+      angle: { min: 220, max: 320 },
+      scale: { start: 1.0, end: 0.2 },
+      alpha: { start: 0.8, end: 0 },
+      gravityY: 15,
+      frequency: -1,
+      blendMode: Phaser.BlendModes.NORMAL,
+      emitting: false,
+    });
+    this.leafEmitter.setDepth(50000);
+  }
+
+  /** Briefly rustle a tall grass bush when the player walks through it */
+  private rustleGrass(col: number, row: number): void {
+    const sprite = this.decorationSprites[row]?.[col];
+    if (!sprite) return;
+    // Don't rustle if this tile has an active spawn (it already has its own animation)
+    if (this.spawns.some(s => s.col === col && s.row === row)) return;
+
+    // Kill any existing rustle tween on this sprite
+    this.tweens.killTweensOf(sprite);
+
+    // Quick rustle: shake then settle back to 0
+    this.tweens.add({
+      targets: sprite,
+      angle: { from: -3, to: 3 },
+      duration: 60,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => sprite.setAngle(0),
+    });
+
+    // Emit a few leaves
+    this.leafEmitter.setPosition(sprite.x, sprite.y - 4);
+    this.leafEmitter.explode(3);
+  }
+
+  // ── Wild Pokemon Spawn System ──────────────────────────────────
+
+  private initSpawnSystem(): void {
+    if (this.encounterTiles.length === 0) return;
+
+    // Spawn 1-2 immediately to populate the area
+    this.trySpawn();
+    if (this.encounterTiles.length > 1) this.trySpawn();
+
+    // Recurring spawn timer
+    this.time.addEvent({
+      delay: SPAWN_INTERVAL_MS,
+      callback: () => this.trySpawn(),
+      loop: true,
+    });
+  }
+
+  private trySpawn(): void {
+    if (this.spawns.length >= MAX_SPAWNS) return;
+
+    // Collect available encounter tiles (no existing spawn, player not standing on it)
+    const occupied = new Set(this.spawns.map(s => `${s.col},${s.row}`));
+    const available = this.encounterTiles.filter(
+      t =>
+        !occupied.has(`${t.col},${t.row}`) &&
+        !(t.col === this.player.col && t.row === this.player.row),
+    );
+    if (available.length === 0) return;
+
+    const target = available[Math.floor(Math.random() * available.length)];
+    this.spawnOnTile(target.col, target.row);
+  }
+
+  private spawnOnTile(col: number, row: number): void {
+    const sprite = this.decorationSprites[row]?.[col];
+    if (!sprite) return;
+
+    const pokemon = generateWildPokemon();
+
+    // Kill any existing tweens
+    this.tweens.killTweensOf(sprite);
+
+    // Brighter tint to signal a hidden Pokemon
+    sprite.setTint(SPAWN_TINT);
+
+    // Intermittent shake: burst of shakes, pause, repeat
+    const doShakeBurst = () => {
+      if (!sprite.active) return;
+      this.tweens.add({
+        targets: sprite,
+        angle: { from: -5, to: 5 },
+        duration: 50,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: 3, // 4 shakes total
+        onComplete: () => { if (sprite.active) sprite.setAngle(0); },
+      });
+      // Emit leaves during the shake burst
+      this.leafEmitter.setPosition(sprite.x, sprite.y - 4);
+      this.leafEmitter.explode(2);
+    };
+
+    // First burst immediately
+    doShakeBurst();
+
+    // Periodic bursts every 2-3 seconds
+    const shakeTimer = this.time.addEvent({
+      delay: 2500,
+      callback: doShakeBurst,
+      loop: true,
+    });
+
+    // Auto-despawn after 1 minute
+    const despawnTimer = this.time.addEvent({
+      delay: SPAWN_LIFETIME_MS,
+      callback: () => this.despawnFromTile(col, row),
+    });
+
+    this.spawns.push({ col, row, pokemon, shakeTimer, despawnTimer });
+  }
+
+  private despawnFromTile(col: number, row: number): void {
+    const idx = this.spawns.findIndex(s => s.col === col && s.row === row);
+    if (idx === -1) return;
+
+    const spawn = this.spawns[idx];
+    spawn.shakeTimer.remove();
+    spawn.despawnTimer.remove();
+
+    // Restore normal appearance
+    const sprite = this.decorationSprites[row]?.[col];
+    if (sprite) {
+      this.tweens.killTweensOf(sprite);
+      sprite.clearTint();
+      sprite.setAngle(0);
+    }
+
+    this.spawns.splice(idx, 1);
+  }
+
+  private checkSpawnEncounter(col: number, row: number): void {
+    const spawn = this.spawns.find(s => s.col === col && s.row === row);
+    if (!spawn) return;
+
+    this.encounterPending = true;
+
+    // Stop movement and clear path
+    this.player.path = [];
+    this.player.isMoving = false;
+
+    // Clean up the spawn visuals
+    const pokemon = spawn.pokemon;
+    this.despawnFromTile(col, row);
+
+    // Flash → fade → battle
+    this.cameras.main.flash(300, 255, 255, 255, false, (_cam: unknown, progress: number) => {
+      if (progress >= 1) {
+        this.cameras.main.fadeOut(400, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          const config = buildWildBattleConfig(pokemon);
+          this.navigate('battle', {
+            config,
+            playerPosition: { col: this.player.col, row: this.player.row },
+          });
+        });
+      }
+    });
   }
 }

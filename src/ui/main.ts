@@ -35,6 +35,7 @@ const navigate: NavigateFn = (screen, params) => {
     case 'battle':
       cleanupFn = showBattleScreen(app, navigate, {
         config: params?.config as import('../types/battle').BattleConfig,
+        playerPosition: params?.playerPosition as { col: number; row: number } | undefined,
       });
       break;
     case 'result':
@@ -44,7 +45,9 @@ const navigate: NavigateFn = (screen, params) => {
       });
       break;
     case 'overworld':
-      cleanupFn = showOverworldScreen(app, navigate);
+      cleanupFn = showOverworldScreen(app, navigate, {
+        playerPosition: params?.playerPosition as { col: number; row: number } | undefined,
+      });
       break;
   }
 }

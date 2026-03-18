@@ -6,7 +6,8 @@ import { VignettePipeline } from '../overworld/effects/VignettePipeline';
 
 export function showOverworldScreen(
   container: HTMLElement,
-  _navigate: NavigateFn,
+  navigate: NavigateFn,
+  params?: { playerPosition?: { col: number; row: number } },
 ): () => void {
   const wrapper = el('div', { class: 'overworld-screen' });
   container.appendChild(wrapper);
@@ -22,6 +23,14 @@ export function showOverworldScreen(
     pixelArt: true,
     scene: [OverworldScene],
     pipeline: [VignettePipeline as any],
+    callbacks: {
+      preBoot: (bootGame) => {
+        bootGame.registry.set('navigate', navigate);
+        if (params?.playerPosition) {
+          bootGame.registry.set('playerPosition', params.playerPosition);
+        }
+      },
+    },
   });
 
   return () => {

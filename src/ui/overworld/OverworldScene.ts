@@ -12,8 +12,10 @@ import {
 import { TEST_MAP, isWalkable, isEncounterTile, getTileHeight, TALL_GRASS_TILES } from './map-data';
 import type { MapData } from './map-data';
 import { generateWildPokemon, buildWildBattleConfig } from './wild-encounter';
+import { playBattleTransition } from './battle-transitions';
 import type { PokemonConfig } from '@/types/pokemon';
 import type { NavigateFn } from '../main';
+import { audioManager } from '../util/audio';
 import {
   createPlayer,
   updatePlayer,
@@ -711,15 +713,20 @@ export class OverworldScene extends Phaser.Scene {
     const pokemon = spawn.pokemon;
     this.despawnFromTile(col, row);
 
-    // Flash → fade → battle
+    // Play battle-start jingle (~2.9s)
+    audioManager.playMusic('./audio/music/battle-start.mp3', false);
+
+    // Flash → pause → screen-wipe transition (timed to match ~2.9s audio)
     this.cameras.main.flash(300, 255, 255, 255, false, (_cam: unknown, progress: number) => {
       if (progress >= 1) {
-        this.cameras.main.fadeOut(400, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-          const config = buildWildBattleConfig(pokemon);
-          this.navigate('battle', {
-            config,
-            playerPosition: { col: this.player.col, row: this.player.row },
+        // Brief dramatic pause after flash before the wipe begins
+        this.time.delayedCall(400, () => {
+          playBattleTransition(this, () => {
+            const config = buildWildBattleConfig(pokemon);
+            this.navigate('battle', {
+              config,
+              playerPosition: { col: this.player.col, row: this.player.row },
+            });
           });
         });
       }

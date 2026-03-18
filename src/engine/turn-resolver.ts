@@ -72,6 +72,10 @@ export class TurnResolver {
           priority = 98; // Run goes third
           speed = 0;
           break;
+        case 'catch':
+          priority = 97; // Catch goes after run
+          speed = 0;
+          break;
         case 'move': {
           const player = state.players[action.player];
           const activeIdx = player.activePokemon[action.slot];
@@ -154,6 +158,9 @@ export class TurnResolver {
         break;
       case 'run':
         this.executeRun(action, state);
+        break;
+      case 'catch':
+        this.executeCatch(action, state);
         break;
     }
   }
@@ -544,7 +551,7 @@ export class TurnResolver {
     action: Extract<TurnAction, { type: 'run' }>,
     state: BattleState,
   ): void {
-    if (!state.config.isWildBattle) {
+    if (state.config.battleType !== 'wild') {
       this.eventBus.emit({ kind: 'fail', turn: state.turn, user: { player: action.player, slot: 0 }, reason: "Can't run from trainer battle!" });
       return;
     }
@@ -562,6 +569,34 @@ export class TurnResolver {
       this.eventBus.emit({
         kind: 'battle-end', turn: state.turn,
         winner: null, reason: 'run',
+      });
+    }
+  }
+
+  private executeCatch(
+    action: Extract<TurnAction, { type: 'catch' }>,
+    state: BattleState,
+  ): void {
+    if (state.config.battleType !== 'wild') {
+      this.eventBus.emit({ kind: 'fail', turn: state.turn, user: { player: action.player, slot: 0 }, reason: "Can't catch Pokemon in trainer battles!" });
+      return;
+    }
+
+    // TODO: Implement full catch mechanics (catch rate formula, ball modifiers, etc.)
+    // For now, use a simple 50% catch chance
+    const success = this.rng.chance(50);
+
+    this.eventBus.emit({
+      kind: 'message', turn: state.turn,
+      text: success ? 'Gotcha! The wild Pokemon was caught!' : 'Oh no! The Pokemon broke free!',
+    });
+
+    if (success) {
+      state.isOver = true;
+      state.winner = 0; // Player wins by capture
+      this.eventBus.emit({
+        kind: 'battle-end', turn: state.turn,
+        winner: 0, reason: 'catch',
       });
     }
   }

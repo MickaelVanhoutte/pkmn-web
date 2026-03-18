@@ -1,5 +1,6 @@
 import type { BattleEvent } from '@/types/events';
 import type { PlayerIndex, BattlePosition } from '@/types/common';
+import type { BattleType } from '@/types/battle';
 
 export interface EventUIUpdate {
   logText?: string;
@@ -177,9 +178,19 @@ function sideName(side: PlayerIndex): string {
   return side === 0 ? 'your' : "the opposing team's";
 }
 
+function switchInLogText(player: PlayerIndex, name: string, battleType?: BattleType): string {
+  if (player === 0) return `Go! ${name}!`;
+  if (battleType === 'wild') return `A wild ${name} appeared!`;
+  return `${name} was sent out!`;
+}
+
+export interface EventRenderContext {
+  battleType?: BattleType;
+}
+
 // --- Main renderer ---
 
-export function renderEvent(event: BattleEvent): EventUIUpdate {
+export function renderEvent(event: BattleEvent, ctx?: EventRenderContext): EventUIUpdate {
   switch (event.kind) {
     case 'battle-start':
       return {
@@ -303,9 +314,7 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
 
     case 'switch-in':
       return {
-        logText: event.player === 0
-          ? `Go! ${event.pokemonName}!`
-          : `${event.pokemonName} was sent out!`,
+        logText: switchInLogText(event.player, event.pokemonName, ctx?.battleType),
         switchAnim: {
           action: 'switch-in',
           player: event.player,
@@ -518,6 +527,8 @@ export function renderEvent(event: BattleEvent): EventUIUpdate {
           : 'You forfeited the battle.';
       } else if (event.reason === 'run') {
         logText = 'You got away safely!';
+      } else if (event.reason === 'catch') {
+        logText = 'You caught the wild Pokemon!';
       } else {
         logText = event.winner === 0
           ? 'You won the battle!'

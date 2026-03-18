@@ -250,7 +250,7 @@ export interface RunAttemptEvent extends BaseEvent {
 export interface BattleEndEvent extends BaseEvent {
   kind: 'battle-end';
   winner: PlayerIndex | null;
-  reason: 'all-fainted' | 'forfeit' | 'turn-limit' | 'run';
+  reason: 'all-fainted' | 'forfeit' | 'turn-limit' | 'run' | 'catch';
 }
 
 export interface MessageEvent extends BaseEvent {

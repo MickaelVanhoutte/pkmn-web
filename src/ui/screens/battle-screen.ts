@@ -125,7 +125,7 @@ export function showBattleScreen(
     onBattleEnd: (winner: PlayerIndex | null) => {
       setTimeout(() => {
         if (disposed) return;
-        if (config.isWildBattle && params.playerPosition) {
+        if (config.battleType === 'wild' && params.playerPosition) {
           navigate('overworld', { playerPosition: params.playerPosition });
         } else {
           navigate('result', { winner, config });

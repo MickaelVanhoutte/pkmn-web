@@ -168,8 +168,14 @@ export function validateActions(
       }
 
       case 'run':
-        if (!state.config.isWildBattle) {
+        if (state.config.battleType !== 'wild') {
           errors.push('Cannot run from trainer battles');
+        }
+        break;
+
+      case 'catch':
+        if (state.config.battleType !== 'wild') {
+          errors.push('Cannot catch Pokemon in trainer battles');
         }
         break;
     }

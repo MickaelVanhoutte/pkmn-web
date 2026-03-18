@@ -300,6 +300,43 @@ export class SpriteAnimator {
   private static readonly DROP_SHADOW = 'drop-shadow(2px 4px 0 rgba(0,0,0,0.35))';
 
   /**
+   * Wild Pokemon reveal: sprite starts as a fully black silhouette (brightness 0)
+   * and slowly fades in to full color. No pokeball throw.
+   */
+  async wildReveal(who: BattlePosition, duration: number): Promise<void> {
+    const el = this.getSlot(who);
+    if (!el) return;
+    const img = el.querySelector('img') as HTMLElement | null;
+
+    // Initial state: fully black silhouette, normal scale
+    el.style.transform = 'scale(0)';
+    el.style.visibility = 'visible';
+    if (img) img.style.filter = `brightness(0) ${SpriteAnimator.DROP_SHADOW}`;
+
+    // Force reflow
+    el.offsetHeight;
+
+    // Phase 1: Scale up while staying black (~30% of duration)
+    const scaleUpDuration = duration * 0.3;
+    await tween(0, 1, scaleUpDuration, getEasing('easeOutBack'), (s) => {
+      el.style.transform = `scale(${s})`;
+    });
+    el.style.transform = '';
+
+    // Brief dramatic pause as silhouette
+    await delay(duration * 0.15);
+
+    // Phase 2: Reveal colors from black to normal (~55% of duration)
+    const revealDuration = duration * 0.55;
+    if (img) {
+      await tween(0, 1, revealDuration, getEasing('easeOutCubic'), (b) => {
+        img.style.filter = `brightness(${b}) ${SpriteAnimator.DROP_SHADOW}`;
+      });
+      img.style.filter = '';
+    }
+  }
+
+  /**
    * Switch-in appear: sprite starts at scale(0) + white, grows to full size
    * with color fading in. Container must have visibility set externally beforehand.
    */

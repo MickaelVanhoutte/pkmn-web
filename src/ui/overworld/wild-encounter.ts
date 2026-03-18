@@ -36,7 +36,7 @@ export function generateWildPokemon(): PokemonConfig {
 export function buildWildBattleConfig(wildPokemon: PokemonConfig): BattleConfig {
   return {
     format: 'singles',
-    isWildBattle: true,
+    battleType: 'wild',
     seed: Math.floor(Math.random() * 100000),
     players: [
       { name: 'Player', team: getPlayerTeam() },

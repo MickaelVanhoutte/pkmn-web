@@ -348,6 +348,18 @@
   background: rgba(60, 60, 60, 0.95);
 }
 
+.action-btn.catch {
+  background: rgba(50, 30, 20, 0.95);
+  border: 2px solid rgba(255, 120, 60, 0.5);
+  box-shadow: 0 0 8px rgba(255, 100, 40, 0.25);
+  color: #ffcc88;
+  font-weight: bold;
+}
+.action-btn.catch:hover:not(:disabled) {
+  background: rgba(70, 40, 25, 0.95);
+  box-shadow: 0 0 14px rgba(255, 120, 60, 0.5);
+}
+
 .action-btn.run {
   background: rgba(44, 44, 44, 0.95);
   border-color: rgba(120, 120, 120, 0.3);

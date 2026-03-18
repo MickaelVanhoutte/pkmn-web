@@ -5,12 +5,14 @@ import {
 import type { PokemonBattleState, PokemonConfig } from './pokemon';
 import type { BattleEvent } from './events';
 
+export type BattleType = 'wild' | 'trainer';
+
 export interface BattleConfig {
   format: BattleFormat;
   players: [PlayerConfig, PlayerConfig];
   seed?: number;
   maxTurns?: number;
-  isWildBattle?: boolean;
+  battleType?: BattleType;
 }
 
 export interface PlayerConfig {
@@ -82,7 +84,8 @@ export type TurnAction =
   | MoveAction
   | SwitchAction
   | ItemAction
-  | RunAction;
+  | RunAction
+  | CatchAction;
 
 export interface MoveAction {
   type: 'move';
@@ -109,6 +112,13 @@ export interface ItemAction {
 export interface RunAction {
   type: 'run';
   player: PlayerIndex;
+}
+
+export interface CatchAction {
+  type: 'catch';
+  player: PlayerIndex;
+  /** ID of the ball item used (for future expansion) */
+  ballId?: ItemId;
 }
 
 export interface ResolvedAction {

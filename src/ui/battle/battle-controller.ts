@@ -5,7 +5,7 @@ import type { PlayerIndex, BattlePosition, MajorStatus } from '@/types/common';
 import type { MoveTarget } from '@/types/move';
 import type { PokemonBattleState } from '@/types/pokemon';
 import { needsTargetSelection, getValidMoveTargets } from '@/engine/action-validator';
-import { renderEvent, type EventUIUpdate } from './event-renderer';
+import { renderEvent, type EventUIUpdate, type EventRenderContext } from './event-renderer';
 import { chooseAIActions } from '../ai/simple-ai';
 import { audioManager } from '../util/audio';
 import type { MoveAnimationPlayer } from '../animation/move-animation-player';
@@ -25,7 +25,7 @@ export interface BattleUI {
     opponent: { update(d: { name: string; level: number; currentHp: number; maxHp: number; status: MajorStatus | null }): void; show(): void; hide(): void }[];
   };
   battleLog: { addEntry(text: string): void; clear(): void };
-  actionMenu: { show(canGoBack?: boolean): void; hide(): void; onFight: (() => void) | null; onPokemon: (() => void) | null; onBag: (() => void) | null; onRun: (() => void) | null; onBack: (() => void) | null };
+  actionMenu: { show(canGoBack?: boolean): void; hide(): void; setWildBattle(isWild: boolean): void; onFight: (() => void) | null; onPokemon: (() => void) | null; onBag: (() => void) | null; onCatch: (() => void) | null; onRun: (() => void) | null; onBack: (() => void) | null };
   movePanel: { show(moves: { moveIndex: number; moveId: string; moveName: string; moveType: string; pp: number; maxPp: number }[]): void; hide(): void; onMoveSelect: ((idx: number) => void) | null; onBack: (() => void) | null };
   switchPanel: { show(pokemon: { teamIndex: number; pokemonName: string; speciesId: string; currentHp: number; maxHp: number; isActive?: boolean; isFainted?: boolean }[]): void; hide(): void; onSwitch: ((idx: number) => void) | null; onBack: (() => void) | null };
   targetPanel: { show(targets: TargetOption[]): void; hide(): void; onTargetSelect: ((position: BattlePosition) => void) | null; onBack: (() => void) | null };
@@ -74,6 +74,10 @@ export class BattleController {
   }
 
   async start(): Promise<void> {
+    // Configure UI for wild vs trainer battle
+    const isWild = this.engine.getState().config.battleType === 'wild';
+    this.ui.actionMenu.setWildBattle(isWild);
+
     audioManager.playMusic('./audio/music/battle1.mp3', true);
     const events = this.engine.startBattle();
     await this.processEvents(events);
@@ -216,6 +220,13 @@ export class BattleController {
         this.cleanupCallbacks();
         resolve({ type: 'run', player: 0 });
       };
+
+      // Catch (wild battles only)
+      this.ui.actionMenu.onCatch = () => {
+        this.hideAllPanels();
+        this.cleanupCallbacks();
+        resolve({ type: 'catch', player: 0 });
+      };
     });
   }
 
@@ -274,9 +285,13 @@ export class BattleController {
 
   // ---- Event processing ----
 
+  private get renderContext(): EventRenderContext {
+    return { battleType: this.engine.getState().config.battleType };
+  }
+
   private async processEvents(events: BattleEvent[]): Promise<void> {
     for (const event of events) {
-      const update = renderEvent(event);
+      const update = renderEvent(event, this.renderContext);
       await this.applyUpdate(update);
 
       const waitMs = update.delay ?? this.eventDelay;
@@ -357,20 +372,33 @@ export class BattleController {
       const sprite = this.ui.sprites[side][slot];
 
       if (action === 'switch-in' && sprite) {
-        // 1. Hide sprite, then set image (so it doesn't flash before pokeball throw)
+        const isWild = this.engine.getState().config.battleType === 'wild';
+        // 1. Hide sprite, then set image (so it doesn't flash before animation)
         sprite.setVisible(false);
         if (speciesId) sprite.updateSprite(speciesId, player === 0 ? 'back' : 'front');
-        // 2. Pokeball throw on canvas (~500ms)
-        if (this.animPlayer) await this.animPlayer.playPokeballThrow(player, slot, 500);
-        // 3. Sprite appears: scale up + color fade (~700ms)
-        if (this.spriteAnimator) {
-          await this.spriteAnimator.switchInAppear({ player, slot }, 700);
+
+        if (isWild && player === 1) {
+          // Wild pokemon: appear as black silhouette, then reveal colors (no pokeball)
+          if (this.spriteAnimator) {
+            await this.spriteAnimator.wildReveal({ player, slot }, 1400);
+          } else {
+            sprite.setVisible(true);
+          }
         } else {
-          sprite.setVisible(true);
+          // Trainer / player pokemon: pokeball throw + scale-in
+          // 2. Pokeball throw on canvas (~500ms)
+          if (this.animPlayer) await this.animPlayer.playPokeballThrow(player, slot, 500);
+          // 3. Sprite appears: scale up + color fade (~700ms)
+          if (this.spriteAnimator) {
+            await this.spriteAnimator.switchInAppear({ player, slot }, 700);
+          } else {
+            sprite.setVisible(true);
+          }
         }
       }
 
       if (action === 'switch-out' && sprite) {
+        const isWild = this.engine.getState().config.battleType === 'wild';
         // Skip animation if sprite is already hidden (e.g. after faint)
         const alreadyHidden = sprite.el.style.visibility === 'hidden';
         if (!alreadyHidden) {
@@ -378,8 +406,10 @@ export class BattleController {
           if (this.spriteAnimator) {
             await this.spriteAnimator.switchOutShrink({ player, slot }, 300);
           }
-          // 2. Pokeball recall on canvas (~400ms)
-          if (this.animPlayer) await this.animPlayer.playPokeballRecall(player, slot, 400);
+          // 2. Pokeball recall on canvas (~400ms) — skip for wild pokemon
+          if (this.animPlayer && !(isWild && player === 1)) {
+            await this.animPlayer.playPokeballRecall(player, slot, 400);
+          }
         }
         // 3. Ensure hidden
         sprite.setVisible(false);
@@ -517,6 +547,7 @@ export class BattleController {
     this.ui.actionMenu.onFight = null;
     this.ui.actionMenu.onPokemon = null;
     this.ui.actionMenu.onBag = null;
+    this.ui.actionMenu.onCatch = null;
     this.ui.actionMenu.onRun = null;
     this.ui.actionMenu.onBack = null;
     this.ui.movePanel.onMoveSelect = null;
